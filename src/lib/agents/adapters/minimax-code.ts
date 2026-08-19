@@ -2,7 +2,7 @@ import { join } from "node:path"
 import type { AgentAdapter } from "../types"
 import { envPath } from "../types"
 import { eventId, localDateOf, readJsonl, timestampOf, tokenCount, walkFiles } from "../../usage/parse"
-import { asObject, asText, tokscaleRoot } from "./shared/cache"
+import { asObject, asText, sharedCacheRoot } from "./shared/cache"
 
 export const minimaxCodeAdapter: AgentAdapter = {
   id: "minimax-code",
@@ -11,7 +11,7 @@ export const minimaxCodeAdapter: AgentAdapter = {
   cacheBacked: true,
   async *discover(context) {
     const override = envPath(context.env, "TOKSCALE_HEADLESS_DIR")
-    const roots = override ? [join(override, "mcode")] : [join(tokscaleRoot(context), "headless", "mcode")]
+    const roots = override ? [join(override, "mcode")] : [join(sharedCacheRoot(context), "headless", "mcode")]
     roots.push(...context.extraRoots.map((root) => join(root, "headless", "mcode")))
     for (const root of roots) {
       for (const path of await walkFiles(root, (name) => name.endsWith(".jsonl"))) yield { agent: "minimax-code", path, kind: "jsonl" }

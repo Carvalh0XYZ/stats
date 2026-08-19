@@ -1,10 +1,9 @@
 # @telemetry-dev/stats
 
-Local web dashboard for token usage across AI coding agents. Think
-[tokscale](https://github.com/junhoyeo/tokscale) coverage with an
-`omp stats`-style local web app: one command scans the agent logs on your
-machine, stores normalized usage in a local SQLite database, and opens a
-dashboard in your browser. Nothing leaves your machine.
+Local web dashboard for token usage across AI coding agents. One command
+scans the agent logs on your machine, stores normalized usage in a local
+SQLite database, and opens a dashboard in your browser. Nothing leaves your
+machine.
 
 ## Usage
 
@@ -26,7 +25,7 @@ Kimchi, Reasonix, Gajae-Code, Jcode, Junie, Augment Code, OpenCodeReview,
 CodeBuddy, WorkBuddy, Cherry Studio, Command Code, DeepSeek Harness, Codebuff,
 Freebuff, Hermes, Kilo CLI, Goose, Zed, Kiro, Antigravity CLI, MiMo Code,
 ZCode, Devin CLI, Devin Desktop, Octofriend (incl. Synthetic), Crush, Cline,
-GitHub Copilot CLI, Roo Code, Kilo, and — via tokscale sync caches — Cursor,
+GitHub Copilot CLI, Roo Code, Kilo, and — via local usage caches — Cursor,
 Google Antigravity, Trae, Warp/Oz, and MiniMax Code.
 
 ## Data and privacy

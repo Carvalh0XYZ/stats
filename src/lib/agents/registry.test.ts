@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import { ADAPTERS } from "./index"
 import { AGENT_IDS, AGENTS, type AgentId } from "./registry"
 
-// The Tokscale source list captured at implementation time. A new upstream
-// source must be added here AND to the registry + an adapter.
+// The upstream source list captured at implementation time. A new source
+// must be added here AND to the registry + an adapter.
 const EXPECTED_AGENT_IDS: AgentId[] = [
   "claude-code", "codex", "gemini-cli", "opencode", "amp", "droid", "pi",
   "omp", "qwen-cli", "kimi", "mux", "grok-build", "openclaw", "prime-agent",

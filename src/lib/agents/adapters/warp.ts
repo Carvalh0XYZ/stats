@@ -3,7 +3,7 @@ import { join } from "node:path"
 import type { AgentAdapter } from "../types"
 import { eventId, localDateOf, readJsonFile, timestampOf, tokenCount } from "../../usage/parse"
 import { ZERO_TOKENS } from "../../usage/types"
-import { asNumber, asObject, asText, tokscaleRoot } from "./shared/cache"
+import { asNumber, asObject, asText, sharedCacheRoot } from "./shared/cache"
 
 export const warpAdapter: AgentAdapter = {
   id: "warp",
@@ -11,7 +11,7 @@ export const warpAdapter: AgentAdapter = {
   version: 1,
   cacheBacked: true,
   async *discover(context) {
-    const paths = [join(tokscaleRoot(context), "warp-cache", "usage.json"), ...context.extraRoots.map((root) => join(root, "warp-cache", "usage.json"))]
+    const paths = [join(sharedCacheRoot(context), "warp-cache", "usage.json"), ...context.extraRoots.map((root) => join(root, "warp-cache", "usage.json"))]
     for (const path of paths) {
       try {
         await access(path)

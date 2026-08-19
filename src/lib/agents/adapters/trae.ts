@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import type { AgentAdapter } from "../types"
 import { eventId, localDateOf, readJsonFile, timestampOf, tokenCount, walkFiles } from "../../usage/parse"
-import { asNumber, asObject, asText, tokscaleRoot } from "./shared/cache"
+import { asNumber, asObject, asText, sharedCacheRoot } from "./shared/cache"
 
 export const traeAdapter: AgentAdapter = {
   id: "trae",
@@ -9,7 +9,7 @@ export const traeAdapter: AgentAdapter = {
   version: 1,
   cacheBacked: true,
   async *discover(context) {
-    const roots = [join(tokscaleRoot(context), "trae-cache", "sessions"), ...context.extraRoots.map((root) => join(root, "trae-cache", "sessions"))]
+    const roots = [join(sharedCacheRoot(context), "trae-cache", "sessions"), ...context.extraRoots.map((root) => join(root, "trae-cache", "sessions"))]
     for (const root of roots) {
       for (const path of await walkFiles(root, (name) => name.endsWith(".json"))) yield { agent: "trae", path, kind: "json" }
     }

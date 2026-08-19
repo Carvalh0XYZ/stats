@@ -1,7 +1,7 @@
 import { join } from "node:path"
 import type { AgentAdapter } from "../types"
 import { eventId, localDateOf, readJsonl, timestampOf, tokenCount, walkFiles } from "../../usage/parse"
-import { asObject, asText, tokscaleRoot } from "./shared/cache"
+import { asObject, asText, sharedCacheRoot } from "./shared/cache"
 
 export const antigravityAdapter: AgentAdapter = {
   id: "antigravity",
@@ -9,7 +9,7 @@ export const antigravityAdapter: AgentAdapter = {
   version: 1,
   cacheBacked: true,
   async *discover(context) {
-    const roots = [join(tokscaleRoot(context), "antigravity-cache", "sessions"), ...context.extraRoots.map((root) => join(root, "antigravity-cache", "sessions"))]
+    const roots = [join(sharedCacheRoot(context), "antigravity-cache", "sessions"), ...context.extraRoots.map((root) => join(root, "antigravity-cache", "sessions"))]
     for (const root of roots) {
       for (const path of await walkFiles(root, (name) => name.endsWith(".jsonl"))) yield { agent: "antigravity", path, kind: "jsonl" }
     }

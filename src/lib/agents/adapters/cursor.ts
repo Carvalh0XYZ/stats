@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs"
 import { basename, join } from "node:path"
 import type { AgentAdapter } from "../types"
 import { eventId, localDateOf, timestampOf, tokenCount } from "../../usage/parse"
-import { tokscaleRoot } from "./shared/cache"
+import { sharedCacheRoot } from "./shared/cache"
 
 export const cursorAdapter: AgentAdapter = {
   id: "cursor",
@@ -10,7 +10,7 @@ export const cursorAdapter: AgentAdapter = {
   version: 1,
   cacheBacked: true,
   async *discover(context) {
-    const roots = [join(tokscaleRoot(context), "cursor-cache"), ...context.extraRoots.map((root) => join(root, "cursor-cache"))]
+    const roots = [join(sharedCacheRoot(context), "cursor-cache"), ...context.extraRoots.map((root) => join(root, "cursor-cache"))]
     for (const root of roots) {
       let names: string[]
       try {

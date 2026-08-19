@@ -4,8 +4,8 @@
  *
  * kind:
  * - "local": reads logs or databases the agent writes on this machine.
- * - "cache": reads cache artifacts produced by external sync tooling
- *   (e.g. tokscale sync commands); shown as "sync required" when absent.
+ * - "cache": reads cache artifacts written by external sync tooling;
+ *   shown as "sync required" when absent.
  * - "attributed": no files of its own; usage is re-attributed from a host
  *   adapter (e.g. Sakana rows inside Codex sessions).
  */

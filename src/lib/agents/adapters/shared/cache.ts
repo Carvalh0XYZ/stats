@@ -2,7 +2,10 @@ import { join } from "node:path"
 import type { DiscoveryContext } from "../../types"
 import { envPath } from "../../types"
 
-export function tokscaleRoot(context: DiscoveryContext): string {
+// Cursor/Antigravity/Trae/Warp/MiniMax usage caches are written by external
+// sync tooling under this fixed config directory; the path segment is part
+// of the on-disk contract and cannot be renamed.
+export function sharedCacheRoot(context: DiscoveryContext): string {
   const config = envPath(context.env, "XDG_CONFIG_HOME") ?? join(context.home, ".config")
   return join(config, "tokscale")
 }
