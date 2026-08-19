@@ -8,44 +8,328 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root"
-import { Route as IndexRouteImport } from "./routes/index"
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as ActivityRouteImport } from './routes/activity'
+import { Route as AgentsRouteImport } from './routes/agents'
+import { Route as ModelsRouteImport } from './routes/models'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as SessionsRouteImport } from './routes/sessions'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ApiAgentsRouteImport } from './routes/api/agents'
+import { Route as ApiBreakdownRouteImport } from './routes/api/breakdown'
+import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiOverviewRouteImport } from './routes/api/overview'
+import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
+import { Route as ApiSettingsRouteImport } from './routes/api/settings'
+import { Route as ApiSyncRouteImport } from './routes/api/sync'
+import { Route as ApiTimeseriesRouteImport } from './routes/api/timeseries'
 
 const IndexRoute = IndexRouteImport.update({
-  id: "/",
-  path: "/",
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivityRoute = ActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModelsRoute = ModelsRouteImport.update({
+  id: '/models',
+  path: '/models',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionsRoute = SessionsRouteImport.update({
+  id: '/sessions',
+  path: '/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentsRoute = ApiAgentsRouteImport.update({
+  id: '/api/agents',
+  path: '/api/agents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBreakdownRoute = ApiBreakdownRouteImport.update({
+  id: '/api/breakdown',
+  path: '/api/breakdown',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOverviewRoute = ApiOverviewRouteImport.update({
+  id: '/api/overview',
+  path: '/api/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionsRoute = ApiSessionsRouteImport.update({
+  id: '/api/sessions',
+  path: '/api/sessions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSettingsRoute = ApiSettingsRouteImport.update({
+  id: '/api/settings',
+  path: '/api/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSyncRoute = ApiSyncRouteImport.update({
+  id: '/api/sync',
+  path: '/api/sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTimeseriesRoute = ApiTimeseriesRouteImport.update({
+  id: '/api/timeseries',
+  path: '/api/timeseries',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/agents': typeof AgentsRoute
+  '/models': typeof ModelsRoute
+  '/projects': typeof ProjectsRoute
+  '/sessions': typeof SessionsRoute
+  '/settings': typeof SettingsRoute
+  '/api/agents': typeof ApiAgentsRoute
+  '/api/breakdown': typeof ApiBreakdownRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/overview': typeof ApiOverviewRoute
+  '/api/sessions': typeof ApiSessionsRoute
+  '/api/settings': typeof ApiSettingsRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/api/timeseries': typeof ApiTimeseriesRoute
 }
 export interface FileRoutesByTo {
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/agents': typeof AgentsRoute
+  '/models': typeof ModelsRoute
+  '/projects': typeof ProjectsRoute
+  '/sessions': typeof SessionsRoute
+  '/settings': typeof SettingsRoute
+  '/api/agents': typeof ApiAgentsRoute
+  '/api/breakdown': typeof ApiBreakdownRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/overview': typeof ApiOverviewRoute
+  '/api/sessions': typeof ApiSessionsRoute
+  '/api/settings': typeof ApiSettingsRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/api/timeseries': typeof ApiTimeseriesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  "/": typeof IndexRoute
+  '/': typeof IndexRoute
+  '/activity': typeof ActivityRoute
+  '/agents': typeof AgentsRoute
+  '/models': typeof ModelsRoute
+  '/projects': typeof ProjectsRoute
+  '/sessions': typeof SessionsRoute
+  '/settings': typeof SettingsRoute
+  '/api/agents': typeof ApiAgentsRoute
+  '/api/breakdown': typeof ApiBreakdownRoute
+  '/api/health': typeof ApiHealthRoute
+  '/api/overview': typeof ApiOverviewRoute
+  '/api/sessions': typeof ApiSessionsRoute
+  '/api/settings': typeof ApiSettingsRoute
+  '/api/sync': typeof ApiSyncRoute
+  '/api/timeseries': typeof ApiTimeseriesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: "/"
+  fullPaths:
+    | '/'
+    | '/activity'
+    | '/agents'
+    | '/models'
+    | '/projects'
+    | '/sessions'
+    | '/settings'
+    | '/api/agents'
+    | '/api/breakdown'
+    | '/api/health'
+    | '/api/overview'
+    | '/api/sessions'
+    | '/api/settings'
+    | '/api/sync'
+    | '/api/timeseries'
   fileRoutesByTo: FileRoutesByTo
-  to: "/"
-  id: "__root__" | "/"
+  to:
+    | '/'
+    | '/activity'
+    | '/agents'
+    | '/models'
+    | '/projects'
+    | '/sessions'
+    | '/settings'
+    | '/api/agents'
+    | '/api/breakdown'
+    | '/api/health'
+    | '/api/overview'
+    | '/api/sessions'
+    | '/api/settings'
+    | '/api/sync'
+    | '/api/timeseries'
+  id:
+    | '__root__'
+    | '/'
+    | '/activity'
+    | '/agents'
+    | '/models'
+    | '/projects'
+    | '/sessions'
+    | '/settings'
+    | '/api/agents'
+    | '/api/breakdown'
+    | '/api/health'
+    | '/api/overview'
+    | '/api/sessions'
+    | '/api/settings'
+    | '/api/sync'
+    | '/api/timeseries'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActivityRoute: typeof ActivityRoute
+  AgentsRoute: typeof AgentsRoute
+  ModelsRoute: typeof ModelsRoute
+  ProjectsRoute: typeof ProjectsRoute
+  SessionsRoute: typeof SessionsRoute
+  SettingsRoute: typeof SettingsRoute
+  ApiAgentsRoute: typeof ApiAgentsRoute
+  ApiBreakdownRoute: typeof ApiBreakdownRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ApiOverviewRoute: typeof ApiOverviewRoute
+  ApiSessionsRoute: typeof ApiSessionsRoute
+  ApiSettingsRoute: typeof ApiSettingsRoute
+  ApiSyncRoute: typeof ApiSyncRoute
+  ApiTimeseriesRoute: typeof ApiTimeseriesRoute
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    "/": {
-      id: "/"
-      path: "/"
-      fullPath: "/"
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activity': {
+      id: '/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof ActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/models': {
+      id: '/models'
+      path: '/models'
+      fullPath: '/models'
+      preLoaderRoute: typeof ModelsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions': {
+      id: '/sessions'
+      path: '/sessions'
+      fullPath: '/sessions'
+      preLoaderRoute: typeof SessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agents': {
+      id: '/api/agents'
+      path: '/api/agents'
+      fullPath: '/api/agents'
+      preLoaderRoute: typeof ApiAgentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/breakdown': {
+      id: '/api/breakdown'
+      path: '/api/breakdown'
+      fullPath: '/api/breakdown'
+      preLoaderRoute: typeof ApiBreakdownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/overview': {
+      id: '/api/overview'
+      path: '/api/overview'
+      fullPath: '/api/overview'
+      preLoaderRoute: typeof ApiOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sessions': {
+      id: '/api/sessions'
+      path: '/api/sessions'
+      fullPath: '/api/sessions'
+      preLoaderRoute: typeof ApiSessionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/settings': {
+      id: '/api/settings'
+      path: '/api/settings'
+      fullPath: '/api/settings'
+      preLoaderRoute: typeof ApiSettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sync': {
+      id: '/api/sync'
+      path: '/api/sync'
+      fullPath: '/api/sync'
+      preLoaderRoute: typeof ApiSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/timeseries': {
+      id: '/api/timeseries'
+      path: '/api/timeseries'
+      fullPath: '/api/timeseries'
+      preLoaderRoute: typeof ApiTimeseriesRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -53,14 +337,28 @@ declare module "@tanstack/react-router" {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActivityRoute: ActivityRoute,
+  AgentsRoute: AgentsRoute,
+  ModelsRoute: ModelsRoute,
+  ProjectsRoute: ProjectsRoute,
+  SessionsRoute: SessionsRoute,
+  SettingsRoute: SettingsRoute,
+  ApiAgentsRoute: ApiAgentsRoute,
+  ApiBreakdownRoute: ApiBreakdownRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ApiOverviewRoute: ApiOverviewRoute,
+  ApiSessionsRoute: ApiSessionsRoute,
+  ApiSettingsRoute: ApiSettingsRoute,
+  ApiSyncRoute: ApiSyncRoute,
+  ApiTimeseriesRoute: ApiTimeseriesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from "./router.tsx"
-import type { createStart } from "@tanstack/react-start"
-declare module "@tanstack/react-start" {
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>

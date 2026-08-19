@@ -1,8 +1,10 @@
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
-import { TanStackDevtools } from "@tanstack/react-devtools"
+import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router"
 
+import { AppShell } from "@/components/app-shell"
 import appCss from "../styles.css?url"
+
+// Applies the persisted theme before first paint to avoid a flash.
+const THEME_SCRIPT = `(function(){try{var t=localStorage.getItem("theme");var d=t==="dark"||(!t&&matchMedia("(prefers-color-scheme: dark)").matches);if(d)document.documentElement.classList.add("dark")}catch(e){}})()`
 
 export const Route = createRootRoute({
   head: () => ({
@@ -15,7 +17,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: "Telemetry Stats",
       },
     ],
     links: [
@@ -31,28 +33,27 @@ export const Route = createRootRoute({
       <p>The requested page could not be found.</p>
     </main>
   ),
+  component: RootComponent,
   shellComponent: RootDocument,
 })
 
+function RootComponent() {
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  )
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
         {children}
-        <TanStackDevtools
-          config={{
-            position: "bottom-right",
-          }}
-          plugins={[
-            {
-              name: "Tanstack Router",
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-          ]}
-        />
         <Scripts />
       </body>
     </html>
