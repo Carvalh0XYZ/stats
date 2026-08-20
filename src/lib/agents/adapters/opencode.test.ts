@@ -47,4 +47,14 @@ describe("OpenCode", () => {
     expect(event?.dedupKey).toBe("msg-1")
     expect(event?.id).toHaveLength(32)
   })
+
+  test("treats a reported zero cost as unpriced and reduces antigravity ids", async () => {
+    const home = await mkdtemp(join(tmpdir(), "stats-opencode-free-"))
+    const path = join(home, ".local", "share", "opencode", "storage", "message", "session", "msg-0.json")
+    await mkdir(dirname(path), { recursive: true })
+    await writeFile(path, JSON.stringify({ ...message, id: "msg-0", cost: 0, modelID: "antigravity-gemini-3-pro-high" }))
+    const source = (await discover(home)).find((item) => item.kind === "legacy")!
+    const event = (await opencodeAdapter.parse(source, parseContext())).events[0]
+    expect(event).toMatchObject({ costUsd: null, costSource: "unpriced", model: "gemini-3-pro" })
+  })
 })

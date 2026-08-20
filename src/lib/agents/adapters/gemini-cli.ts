@@ -6,7 +6,7 @@ import { fileSession, recordOf, standardTokens, textOf, usageEvent } from "./sha
 export const geminiCliAdapter: AgentAdapter = {
   id: "gemini-cli",
   label: "Gemini CLI",
-  version: 1,
+  version: 2,
   async *discover(context) {
     const home = context.env.GEMINI_CLI_HOME?.trim() || join(context.home, ".gemini")
     for (const path of await walkFiles(join(home, "tmp"), (name) => name.endsWith(".json"))) {
@@ -26,6 +26,9 @@ export const geminiCliAdapter: AgentAdapter = {
       const message = recordOf(value)
       const tokens = recordOf(message?.tokens)
       if (!message || !tokens || message.type === "user" || message.role === "user") continue
+      // Gemini's prompt token count includes cached content tokens.
+      const usage = standardTokens(tokens)
+      usage.input = Math.max(usage.input - usage.cacheRead, 0)
       const event = usageEvent({
         agent: "gemini-cli",
         path: source.path,
@@ -36,7 +39,7 @@ export const geminiCliAdapter: AgentAdapter = {
         project: textOf(root.projectHash) ?? null,
         timestamp: message.timestamp ?? message.createdAt ?? root.startTime,
         timezone: context.timezone,
-        tokens: standardTokens(tokens),
+        tokens: usage,
         cost: message.costUSD,
         dedupKey: textOf(message.id),
       })

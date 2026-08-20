@@ -13,7 +13,7 @@ interface MessageRow {
 export const opencodeAdapter: AgentAdapter = {
   id: "opencode",
   label: "OpenCode",
-  version: 1,
+  version: 3,
   async *discover(context) {
     const data = context.env.XDG_DATA_HOME?.trim() || join(context.home, ".local", "share")
     const root = join(data, "opencode")
@@ -71,7 +71,7 @@ function makeEvent(message: Record<string, unknown>, source: UsageSource, contex
     path: source.path,
     identity,
     provider: textOf(message.providerID),
-    model: textOf(message.modelID),
+    model: normalizeModel(textOf(message.modelID)),
     sessionId,
     project: textOf(message.project),
     timestamp: time.created,
@@ -81,8 +81,20 @@ function makeEvent(message: Record<string, unknown>, source: UsageSource, contex
       cacheRead: numberOf(recordOf(tokens.cache)?.read),
       cacheWrite: numberOf(recordOf(tokens.cache)?.write),
     }),
-    cost: message.cost,
+    // OpenCode reports cost 0 when it had no pricing for the model
+    // (subscription models included); only a positive cost is authoritative.
+    cost: (numberOf(message.cost) ?? 0) > 0 ? message.cost : null,
     durationMs: numberOf(time.completed) === null || numberOf(time.created) === null ? null : Math.max((numberOf(time.completed) ?? 0) - (numberOf(time.created) ?? 0), 0),
     dedupKey: identity,
   })
+}
+
+/**
+ * OpenCode's Antigravity routing prefixes the underlying Gemini model id and
+ * may append a reasoning tier ("antigravity-gemini-3-pro-high"); the pricing
+ * catalog only knows the base id.
+ */
+function normalizeModel(model: string | null): string | null {
+  if (!model?.startsWith("antigravity-")) return model
+  return model.slice("antigravity-".length).replace(/-(?:low|medium|high|xhigh)$/u, "")
 }
