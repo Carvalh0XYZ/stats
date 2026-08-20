@@ -7,7 +7,9 @@ import {
   Tooltip as RechartsTooltip,
 } from "recharts"
 
-import type { TimeSeries, TokenTotals } from "@/lib/api/types"
+import { AGENTS } from "@/lib/agents/registry"
+import type { AgentId } from "@/lib/agents/registry"
+import type { AgentPoint, TimeSeries, TokenTotals } from "@/lib/api/types"
 import { formatCost, formatCount, formatTokens } from "@/components/data/format"
 import {
   Tooltip,
@@ -269,16 +271,64 @@ function formatMetric(value: number, metric: SeriesMetric) {
   return `${formatTokens(Math.round(value))} tokens`
 }
 
+const MAX_AGENT_LINES = 5
+
+const LINE_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
+
+/**
+ * Per-agent lines for the top agents by the chosen metric. Agents beyond
+ * the top five are omitted: their near-zero values draw as a flat line
+ * pinned to the baseline.
+ */
+function buildAgentLines(series: TimeSeries, metric: SeriesMetric) {
+  const pick = (slice: AgentPoint) =>
+    metric === "cost"
+      ? slice.costUsd
+      : metric === "events"
+        ? slice.events
+        : slice.tokens
+  const totals = new Map<AgentId, number>()
+  for (const point of series.points) {
+    for (const [agent, slice] of Object.entries(point.byAgent)) {
+      totals.set(agent as AgentId, (totals.get(agent as AgentId) ?? 0) + pick(slice))
+    }
+  }
+  const keys = [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, MAX_AGENT_LINES)
+    .map(([agent]) => agent)
+
+  const labels = keys.map((agent) => AGENTS[agent].label)
+  const rows = series.points.map((point) => {
+    const row: Record<string, number> = {}
+    for (const agent of keys) row[agent] = 0
+    for (const [agent, slice] of Object.entries(point.byAgent)) {
+      if (keys.includes(agent as AgentId)) row[agent] = pick(slice)
+    }
+    return row
+  })
+
+  return { keys, labels, rows }
+}
+
 /** Active point marker — a pulsing dot; grey on idle days. */
 function PulsingDot(props: {
   cx?: number
   cy?: number
   payload?: { value?: number }
+  color?: string
 }) {
   const { cx: x, cy: y, payload } = props
   if (x == null || y == null) return null
   const color =
-    payload?.value === 0 ? "var(--muted-foreground)" : "var(--chart-1)"
+    props.color ??
+    (payload?.value === 0 ? "var(--muted-foreground)" : "var(--chart-1)")
   return (
     <g>
       <circle cx={x} cy={y} r={5} fill={color} opacity={0.3}>
@@ -377,6 +427,17 @@ export function UsageChartCard({
     () => buildSegments(values),
     [values]
   )
+  // Buckets carry per-agent slices: draw one line per agent when 2+ exist.
+  const agents = React.useMemo(
+    () => buildAgentLines(series, metric),
+    [series, metric]
+  )
+  const multi = agents.keys.length > 1
+  const rows = React.useMemo(
+    () =>
+      multi ? data.map((row, i) => ({ ...row, ...agents.rows[i] })) : data,
+    [multi, data, agents]
+  )
 
   const hovering = activeIndex !== null && activeIndex < points.length
   const target = hovering
@@ -414,7 +475,7 @@ export function UsageChartCard({
       <div className="animate-chart-reveal h-[200px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
-            data={data}
+            data={rows}
             // 2px bottom room so the 2px stroke isn't clipped on zero days
             margin={{ top: 27, right: 0, bottom: 2, left: 0 }}
             onMouseMove={(state) => {
@@ -441,33 +502,55 @@ export function UsageChartCard({
                 strokeDasharray: "4 4",
               }}
             />
-            {/* Sharp joins on purpose: type="linear", not monotone */}
-            <Area
-              type="linear"
-              dataKey="value"
-              stroke="none"
-              fill={`url(#${gradientId})`}
-              isAnimationActive={false}
-            />
-            {/* Alternating segments: dashed grey along zero runs, solid accent
-                (incl. the descent/climb touching the baseline) in between */}
-            {segments.map((seg) => (
-              <Line
-                key={seg.key}
+            {/* Sharp joins on purpose: type="linear", not monotone.
+                No area in multi mode: the total's shade would float above
+                the per-agent lines. */}
+            {multi ? null : (
+              <Area
                 type="linear"
-                dataKey={seg.key}
-                stroke={
-                  seg.dashed ? "var(--muted-foreground)" : "var(--chart-1)"
-                }
-                strokeWidth={2}
-                strokeDasharray={seg.dashed ? "5 5" : undefined}
-                dot={false}
-                activeDot={seg.dashed ? <PulsingDot /> : <SolidDot />}
-                // The container's clip-path reveal handles the entrance;
-                // recharts' own interpolation would fight it.
+                dataKey="value"
+                stroke="none"
+                fill={`url(#${gradientId})`}
                 isAnimationActive={false}
               />
-            ))}
+            )}
+            {/* Alternating segments: dashed grey along zero runs, solid accent
+                (incl. the descent/climb touching the baseline) in between.
+                Multi-agent mode draws one colored line per agent instead. */}
+            {multi
+              ? agents.keys.map((key, index) => (
+                  <Line
+                    key={key}
+                    type="linear"
+                    dataKey={key}
+                    stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={
+                      <PulsingDot
+                        color={LINE_COLORS[index % LINE_COLORS.length]}
+                      />
+                    }
+                    isAnimationActive={false}
+                  />
+                ))
+              : segments.map((seg) => (
+                  <Line
+                    key={seg.key}
+                    type="linear"
+                    dataKey={seg.key}
+                    stroke={
+                      seg.dashed ? "var(--muted-foreground)" : "var(--chart-1)"
+                    }
+                    strokeWidth={2}
+                    strokeDasharray={seg.dashed ? "5 5" : undefined}
+                    dot={false}
+                    activeDot={seg.dashed ? <PulsingDot /> : <SolidDot />}
+                    // The container's clip-path reveal handles the entrance;
+                    // recharts' own interpolation would fight it.
+                    isAnimationActive={false}
+                  />
+                ))}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
@@ -477,6 +560,25 @@ export function UsageChartCard({
         <div className="mt-2 flex w-full items-start justify-between px-5 text-[11px] font-medium whitespace-nowrap text-muted-foreground">
           <p>{formatBucketTick(points[0].t, series.bucketMs)}</p>
           <p>{formatBucketTick(points[points.length - 1].t, series.bucketMs)}</p>
+        </div>
+      ) : null}
+
+      {/* Legend — one entry per agent line */}
+      {multi ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 px-5">
+          {agents.keys.map((key, index) => (
+            <span
+              key={key}
+              className="flex items-center gap-1.5 text-[13px] text-muted-foreground"
+            >
+              <span
+                aria-hidden
+                className="size-2.5 rounded-[3px]"
+                style={{ background: LINE_COLORS[index % LINE_COLORS.length] }}
+              />
+              {agents.labels[index]}
+            </span>
+          ))}
         </div>
       ) : null}
     </section>

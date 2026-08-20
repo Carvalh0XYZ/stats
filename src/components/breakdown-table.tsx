@@ -39,9 +39,12 @@ const PER_PAGE = 10
 export function BreakdownTable({
   rows,
   nameLabel,
+  onSelect,
 }: {
   rows: BreakdownRow[]
   nameLabel: string
+  /** Row click — filter by this row's key. "(unknown)" rows never fire. */
+  onSelect?: (key: string) => void
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "tokens", desc: true },
@@ -193,14 +196,19 @@ export function BreakdownTable({
             </tr>
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row) => (
-              <tr
-                key={row.id}
-                className={cn(
-                  "border-b transition-colors duration-150 hover:bg-muted/50",
-                  totalPages <= 1 && "last:border-transparent"
-                )}
-              >
+            {table.getRowModel().rows.map((row) => {
+              const selectable = onSelect && row.original.key !== "(unknown)"
+              return (
+                <tr
+                  key={row.id}
+                  onClick={selectable ? () => onSelect(row.original.key) : undefined}
+                  title={selectable ? `Filter by ${row.original.label}` : undefined}
+                  className={cn(
+                    "border-b transition-colors duration-150 hover:bg-muted/50",
+                    selectable && "cursor-pointer",
+                    totalPages <= 1 && "last:border-transparent"
+                  )}
+                >
                 {row.getVisibleCells().map((cell) => (
                   <td
                     key={cell.id}
@@ -214,8 +222,9 @@ export function BreakdownTable({
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
-              </tr>
-            ))}
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -39,6 +39,12 @@ export function statsUrl(
   for (const agent of filter.agents ?? []) {
     params.append("agent", agent)
   }
+  for (const model of filter.models ?? []) {
+    params.append("model", model)
+  }
+  for (const project of filter.projects ?? []) {
+    params.append("project", project)
+  }
   if (filter.from) params.set("from", filter.from)
   if (filter.to) params.set("to", filter.to)
   for (const [key, value] of Object.entries(extra ?? {})) {
@@ -73,9 +79,20 @@ export function parseStatsSearch(input: Record<string, unknown>): StatsFilter {
     (value): value is AgentId => typeof value === "string" && isAgentId(value)
   )
   if (agents.length > 0) search.agents = agents
+  const models = stringList(input["models"])
+  if (models.length > 0) search.models = models
+  const projects = stringList(input["projects"])
+  if (projects.length > 0) search.projects = projects
   const from = input["from"]
   if (typeof from === "string" && ISO_DATE.test(from)) search.from = from
   const to = input["to"]
   if (typeof to === "string" && ISO_DATE.test(to)) search.to = to
   return search
+}
+
+function stringList(raw: unknown): string[] {
+  const list = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : []
+  return list.filter(
+    (value): value is string => typeof value === "string" && value !== ""
+  )
 }

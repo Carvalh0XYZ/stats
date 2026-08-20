@@ -74,8 +74,8 @@ describe("analytics queries", () => {
     expect(series.points.length).toBeGreaterThanOrEqual(24)
     const active = series.points.filter(point => point.tokens > 0)
     expect(active).toHaveLength(1)
-    expect(active[0].byAgent["claude-code"]).toBe(150)
-    expect(active[0].byAgent.codex).toBe(150)
+    expect(active[0].byAgent["claude-code"]?.tokens).toBe(150)
+    expect(active[0].byAgent.codex?.tokens).toBe(150)
   })
 
   it("breaks down by agent with share and estimation flags", () => {

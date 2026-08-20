@@ -8,6 +8,10 @@ export const TIME_RANGES: TimeRange[] = ["24h", "7d", "30d", "90d", "year", "all
 export interface StatsFilter {
   range: TimeRange
   agents?: AgentId[]
+  /** Exact model names as stored (breakdown row keys). */
+  models?: string[]
+  /** Canonical project paths as stored (breakdown row keys). */
+  projects?: string[]
   /** ISO dates; when present they override range. */
   from?: string
   to?: string
@@ -41,14 +45,20 @@ export interface OverviewStats {
   lastTimestamp: number | null
 }
 
+export interface AgentPoint {
+  tokens: number
+  costUsd: number
+  events: number
+}
+
 export interface TimeSeriesPoint {
   /** Bucket start, epoch ms. */
   t: number
   tokens: number
   costUsd: number
   events: number
-  /** Tokens per agent present in the bucket. */
-  byAgent: Partial<Record<AgentId, number>>
+  /** Per-agent slice of the bucket. */
+  byAgent: Partial<Record<AgentId, AgentPoint>>
 }
 
 export interface TimeSeries {

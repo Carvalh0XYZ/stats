@@ -1,3 +1,5 @@
+import { useNavigate } from "@tanstack/react-router"
+
 import type {
   BreakdownDimension,
   BreakdownRow,
@@ -7,6 +9,13 @@ import { getJson, statsUrl } from "@/components/data/api"
 import { usePoll } from "@/components/data/use-poll"
 import { BreakdownTable } from "@/components/breakdown-table"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
+
+/** Which filter list a clicked row's key belongs to. */
+const FILTER_KEY: Partial<Record<BreakdownDimension, "agents" | "models" | "projects">> = {
+  agent: "agents",
+  model: "models",
+  project: "projects",
+}
 
 export function BreakdownPage({
   filter,
@@ -19,6 +28,7 @@ export function BreakdownPage({
   title: string
   nameLabel: string
 }) {
+  const navigate = useNavigate()
   const poll = usePoll(
     () => getJson<BreakdownRow[]>(statsUrl("breakdown", filter, { dimension })),
     `${dimension}:${JSON.stringify(filter)}`
@@ -36,15 +46,34 @@ export function BreakdownPage({
     )
   }
 
+  const filterKey = FILTER_KEY[dimension]
+  const select = filterKey
+    ? (key: string) => {
+        void navigate({
+          to: ".",
+          search: (prev: Record<string, unknown>) => {
+            const current = (prev[filterKey] as string[] | undefined) ?? []
+            if (current.includes(key)) return prev
+            return { ...prev, [filterKey]: [...current, key] }
+          },
+        })
+      }
+    : undefined
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-0.5">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         <p className="text-[13px] text-muted-foreground">
           Token usage by {dimension} in the selected range
+          {select ? " — click a row to filter" : ""}
         </p>
       </div>
-      <BreakdownTable rows={poll.data} nameLabel={nameLabel} />
+      <BreakdownTable
+        rows={poll.data}
+        nameLabel={nameLabel}
+        onSelect={select}
+      />
     </div>
   )
 }

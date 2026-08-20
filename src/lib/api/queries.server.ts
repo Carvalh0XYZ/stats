@@ -4,6 +4,7 @@ import { ADAPTERS } from "../agents"
 import { canonicalProject, displayProject } from "../usage/project.server"
 import { getDb } from "../db/client.server"
 import type {
+  AgentPoint,
   AgentStatus,
   BreakdownDimension,
   BreakdownRow,
@@ -61,6 +62,14 @@ function whereOf(filter: StatsFilter): WhereClause {
   if (to !== null) {
     clauses.push("timestamp < ?")
     params.push(to)
+  }
+  if (filter.models?.length) {
+    clauses.push(`model IN (${filter.models.map(() => "?").join(", ")})`)
+    params.push(...filter.models)
+  }
+  if (filter.projects?.length) {
+    clauses.push(`project IN (${filter.projects.map(() => "?").join(", ")})`)
+    params.push(...filter.projects)
   }
   if (filter.agents?.length) {
     clauses.push(`agent IN (${filter.agents.map(() => "?").join(", ")})`)
@@ -205,7 +214,7 @@ export function getTimeSeries(filter: StatsFilter): TimeSeries {
   const points = []
   for (let t = start; t <= end; t += bucketMs) {
     const bucketRows = byBucket.get(t) ?? []
-    const byAgent: Partial<Record<AgentId, number>> = {}
+    const byAgent: Partial<Record<AgentId, AgentPoint>> = {}
     let tokens = 0
     let costUsd = 0
     let events = 0
@@ -213,7 +222,12 @@ export function getTimeSeries(filter: StatsFilter): TimeSeries {
       tokens += row.tokens
       costUsd += row.cost
       events += row.events
-      if (isAgentId(row.agent)) byAgent[row.agent] = (byAgent[row.agent] ?? 0) + row.tokens
+      if (isAgentId(row.agent)) {
+        const slice = (byAgent[row.agent] ??= { tokens: 0, costUsd: 0, events: 0 })
+        slice.tokens += row.tokens
+        slice.costUsd += row.cost
+        slice.events += row.events
+      }
     }
     points.push({ t, tokens, costUsd, events, byAgent })
   }

@@ -7,6 +7,7 @@ import {
   MoonIcon,
   RefreshCwIcon,
   SunIcon,
+  XIcon,
 } from "lucide-react"
 
 import { AGENTS, AGENT_IDS, type AgentId } from "@/lib/agents/registry"
@@ -59,6 +60,8 @@ function useFilter(): StatsFilter {
   return {
     range: search.range ?? "30d",
     agents: search.agents,
+    models: search.models,
+    projects: search.projects,
     from: search.from,
     to: search.to,
   }
@@ -137,7 +140,8 @@ function Toolbar() {
   const navigate = useNavigate()
   const range = search.range ?? "30d"
   const agents = search.agents ?? []
-
+  const models = search.models ?? []
+  const projects = search.projects ?? []
   const setRange = (next: TimeRange) => {
     void navigate({
       to: ".",
@@ -161,9 +165,37 @@ function Toolbar() {
     })
   }
 
+  const removeFrom = (key: "models" | "projects", value: string) => {
+    void navigate({
+      to: ".",
+      search: (prev: Record<string, unknown>) => {
+        const rest = ((prev[key] as string[] | undefined) ?? []).filter(
+          (item) => item !== value
+        )
+        return { ...prev, [key]: rest.length > 0 ? rest : undefined }
+      },
+    })
+  }
+
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-      <AgentFilter selected={agents} onChange={setAgents} />
+      <div className="flex flex-wrap items-center gap-1.5">
+        <AgentFilter selected={agents} onChange={setAgents} />
+        {models.map((model) => (
+          <FilterChip
+            key={model}
+            label={model}
+            onRemove={() => removeFrom("models", model)}
+          />
+        ))}
+        {projects.map((project) => (
+          <FilterChip
+            key={project}
+            label={project.split("/").pop() || project}
+            onRemove={() => removeFrom("projects", project)}
+          />
+        ))}
+      </div>
       <div
         role="group"
         aria-label="Date range"
@@ -186,6 +218,27 @@ function Toolbar() {
         ))}
       </div>
     </div>
+  )
+}
+
+/** Active model/project filter, removable with ✕. */
+function FilterChip({
+  label,
+  onRemove,
+}: {
+  label: string
+  onRemove: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      title={`Remove filter ${label}`}
+      className="flex min-h-10 items-center gap-1 rounded-md border bg-muted/50 px-2 text-[13px] hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring md:min-h-7"
+    >
+      <span className="max-w-40 truncate">{label}</span>
+      <XIcon className="size-3.5 text-muted-foreground" aria-hidden />
+    </button>
   )
 }
 

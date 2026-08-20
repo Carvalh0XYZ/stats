@@ -8,12 +8,16 @@ export function filterFromUrl(url: URL): StatsFilter {
     ? (rangeParam as TimeRange)
     : "30d"
   const agents = url.searchParams.getAll("agent").filter(isAgentId)
+  const models = url.searchParams.getAll("model").filter(Boolean)
+  const projects = url.searchParams.getAll("project").filter(Boolean)
   const from = url.searchParams.get("from")
   const to = url.searchParams.get("to")
   const isoDay = /^\d{4}-\d{2}-\d{2}$/
   return {
     range,
     agents: agents.length ? agents : undefined,
+    models: models.length ? models : undefined,
+    projects: projects.length ? projects : undefined,
     from: from && isoDay.test(from) ? from : undefined,
     to: to && isoDay.test(to) ? to : undefined,
   }
