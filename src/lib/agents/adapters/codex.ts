@@ -16,6 +16,7 @@ interface Totals {
 /** Token-bearing event awaiting a model name from a later record. */
 interface PendingEvent {
   provider: string
+  project: string | null
   timestamp: unknown
   tokens: TokenBreakdown
   total: Totals | null
@@ -40,7 +41,7 @@ interface ForkState {
 export const codexAdapter: AgentAdapter = {
   id: "codex",
   label: "Codex CLI",
-  version: 2,
+  version: 3,
   async *discover(context) {
     const home = context.env.CODEX_HOME?.trim() || join(context.home, ".codex")
     for (const root of [join(home, "sessions"), join(home, "archived_sessions")]) {
@@ -59,6 +60,7 @@ export const codexAdapter: AgentAdapter = {
     const pending: PendingEvent[] = []
     let model: string | null = null
     let provider = "openai"
+    let project: string | null = null
     let metaSessionId: string | null = null
     let previous: Totals | null = null
     const fork: ForkState = {
@@ -86,7 +88,7 @@ export const codexAdapter: AgentAdapter = {
         provider: entry.provider,
         model: eventModel,
         sessionId,
-        project: null,
+        project: entry.project,
         timestamp: entry.timestamp,
         timezone: context.timezone,
         tokens: entry.tokens,
@@ -123,6 +125,7 @@ export const codexAdapter: AgentAdapter = {
           fork.isUserFork = false
           if (fork.childSessionId) metaSessionId = fork.childSessionId
           model = payloadModel
+          project = textOf(payload.cwd) ?? project
           continue
         }
         if (entry.type === "event_msg" && payload.type === "task_started") {
@@ -174,11 +177,13 @@ export const codexAdapter: AgentAdapter = {
           }
         }
         provider = textOf(payload.model_provider) ?? provider
+        project = textOf(payload.cwd) ?? project
         continue
       }
       if (entry.type === "turn_context") {
         model = payloadModel ?? model
         provider = textOf(payload.model_provider) ?? provider
+        project = textOf(payload.cwd) ?? project
         if (model) flushPending(model)
         continue
       }
@@ -238,7 +243,7 @@ export const codexAdapter: AgentAdapter = {
       if (tokens.input === 0 && tokens.output === 0 && tokens.cacheRead === 0 && tokens.reasoning === 0) continue
       previous = nextTotals
 
-      const record: PendingEvent = { provider, timestamp: entry.timestamp, tokens, total }
+      const record: PendingEvent = { provider, project, timestamp: entry.timestamp, tokens, total }
       if (resolved) emit(record, resolved)
       else pending.push(record)
     }

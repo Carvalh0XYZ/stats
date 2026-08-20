@@ -69,8 +69,8 @@ describe("Codex", () => {
     const codexHome = join(home, "custom")
     const path = join(codexHome, "sessions", "session.jsonl")
     await fixture(path, [
-      { type: "session_meta", payload: { model_provider: "sakana" } },
-      { type: "turn_context", payload: { model: "fugu" } },
+      { type: "session_meta", payload: { model_provider: "sakana", cwd: "/work/session" } },
+      { type: "turn_context", payload: { model: "fugu", cwd: "/work/app" } },
       { type: "event_msg", timestamp: "2026-01-02T00:00:00Z", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3, reasoning_output_tokens: 1 }, total_token_usage: { input_tokens: 10, cached_input_tokens: 2, output_tokens: 3, reasoning_output_tokens: 1 } } } },
       { type: "event_msg", timestamp: "2026-01-02T00:01:00Z", payload: { type: "token_count", info: { total_token_usage: { input_tokens: 18, cached_input_tokens: 4, output_tokens: 7, reasoning_output_tokens: 2 } } } },
       // Duplicate cumulative snapshot: skipped, not double counted.
@@ -86,7 +86,23 @@ describe("Codex", () => {
       { input: 6, output: 3, cacheRead: 2, cacheWrite: 0, reasoning: 1 },
     ])
     expect(events.every((event) => event.agent === "sakana" && event.provider === "sakana")).toBe(true)
+    expect(events.every((event) => event.project === "/work/app")).toBe(true)
     expect(events[0]?.dedupKey).toBe("session:sakana:fugu:10:3:2:1")
+  })
+
+  test("keeps pending token events with their original project", async () => {
+    const home = await mkdtemp(join(tmpdir(), "stats-codex-pending-"))
+    const codexHome = join(home, "custom")
+    const path = join(codexHome, "sessions", "pending.jsonl")
+    await fixture(path, [
+      { type: "session_meta", payload: { cwd: "/work/original" } },
+      { type: "event_msg", timestamp: "2026-01-02T00:00:00Z", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 5, output_tokens: 2 }, total_token_usage: { input_tokens: 5, output_tokens: 2 } } } },
+      { type: "turn_context", payload: { model: "gpt-new", cwd: "/work/next" } },
+    ])
+    const [source] = await sources(codexAdapter, home, { CODEX_HOME: codexHome })
+    const events = (await codexAdapter.parse(source!, parseContext())).events
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject({ model: "gpt-new", project: "/work/original" })
   })
 
   test("skips replayed parent history in forked child logs", async () => {
@@ -97,10 +113,10 @@ describe("Codex", () => {
     const child = "01920000-0000-7000-8000-000000000001"
     const ownTurn = "01920000-0001-7000-8000-000000000002"
     await fixture(path, [
-      { type: "session_meta", timestamp: "2026-01-02T00:00:00Z", payload: { id: child, forked_from_id: "parent-session", model_provider: "openai" } },
-      { type: "session_meta", timestamp: "2026-01-02T00:00:00Z", payload: { id: "parent-session", model_provider: "openai" } },
+      { type: "session_meta", timestamp: "2026-01-02T00:00:00Z", payload: { id: child, forked_from_id: "parent-session", model_provider: "openai", cwd: "/work/child" } },
+      { type: "session_meta", timestamp: "2026-01-02T00:00:00Z", payload: { id: "parent-session", model_provider: "openai", cwd: "/work/parent" } },
       // Replayed parent history: model and token_count arrive before the child's own turn.
-      { type: "turn_context", timestamp: "2026-01-02T00:00:00Z", payload: { turn_id: "01910000-0000-7000-8000-00000000000a", model: "gpt-old" } },
+      { type: "turn_context", timestamp: "2026-01-02T00:00:00Z", payload: { turn_id: "01910000-0000-7000-8000-00000000000a", model: "gpt-old", cwd: "/work/parent" } },
       { type: "event_msg", timestamp: "2026-01-02T00:00:01Z", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 100, output_tokens: 30 }, total_token_usage: { input_tokens: 100, output_tokens: 30, total_tokens: 130 } } } },
       // The child's own turn ends the replay skip.
       { type: "turn_context", timestamp: "2026-01-02T00:00:02Z", payload: { turn_id: ownTurn, model: "gpt-new" } },
@@ -109,7 +125,7 @@ describe("Codex", () => {
     const [source] = await sources(codexAdapter, home, { CODEX_HOME: codexHome })
     const events = (await codexAdapter.parse(source!, parseContext())).events
     expect(events).toHaveLength(1)
-    expect(events[0]).toMatchObject({ model: "gpt-new", tokens: { input: 50, output: 10, cacheRead: 0, cacheWrite: 0, reasoning: 0 } })
+    expect(events[0]).toMatchObject({ model: "gpt-new", project: "/work/child", tokens: { input: 50, output: 10, cacheRead: 0, cacheWrite: 0, reasoning: 0 } })
     // Dedup keys are scoped to the fork parent so sibling replays collapse.
     expect(events[0]?.dedupKey).toBe("parent-session:openai:gpt-new:150:40:0:0")
   })
