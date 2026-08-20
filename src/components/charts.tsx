@@ -35,9 +35,16 @@ export function UsageAreaChart({
   const formatValue = metric === "cost" ? formatCost : formatTokens
 
   return (
-    <ChartContainer config={config} className="h-64 w-full">
+    <ChartContainer
+      config={config}
+      className="h-64 w-full [&_.recharts-cartesian-axis-tick_text]:font-mono [&_.recharts-cartesian-axis-tick_text]:text-[11px]"
+    >
       <AreaChart data={data} margin={{ left: 0, right: 8, top: 8 }}>
-        <CartesianGrid vertical={false} />
+        <CartesianGrid
+          vertical={false}
+          strokeDasharray="3 3"
+          stroke="var(--border)"
+        />
         <XAxis
           dataKey="t"
           tickLine={false}
@@ -49,7 +56,9 @@ export function UsageAreaChart({
           width={48}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(v: number) => (metric === "cost" ? formatCost(v) : formatTokens(v))}
+          tickFormatter={(v: number) =>
+            metric === "cost" ? formatCost(v) : formatTokens(v)
+          }
         />
         <ChartTooltip
           content={
@@ -78,8 +87,9 @@ export function UsageAreaChart({
             stackId="usage"
             type="monotone"
             fill={`var(--chart-${(index % 5) + 1})`}
-            fillOpacity={0.5}
+            fillOpacity={0.18}
             stroke={`var(--chart-${(index % 5) + 1})`}
+            strokeWidth={1.5}
             isAnimationActive={false}
           />
         ))}
@@ -95,7 +105,10 @@ function buildSeriesData(series: TimeSeries, metric: SeriesMetric) {
       [key]: { label: metric === "cost" ? "Cost" : "Events" },
     }
     return {
-      data: series.points.map((p) => ({ t: p.t, [key]: metric === "cost" ? p.costUsd : p.events })),
+      data: series.points.map((p) => ({
+        t: p.t,
+        [key]: metric === "cost" ? p.costUsd : p.events,
+      })),
       keys: [key],
       config,
     }
@@ -104,7 +117,10 @@ function buildSeriesData(series: TimeSeries, metric: SeriesMetric) {
   const totals = new Map<AgentId, number>()
   for (const point of series.points) {
     for (const [agent, tokens] of Object.entries(point.byAgent)) {
-      totals.set(agent as AgentId, (totals.get(agent as AgentId) ?? 0) + (tokens ?? 0))
+      totals.set(
+        agent as AgentId,
+        (totals.get(agent as AgentId) ?? 0) + (tokens ?? 0)
+      )
     }
   }
   const top = [...totals.entries()]
@@ -116,7 +132,9 @@ function buildSeriesData(series: TimeSeries, metric: SeriesMetric) {
   const keys: string[] = [...top, ...(hasOther ? ["other"] : [])]
   const config: ChartConfig = {}
   for (const key of keys) {
-    config[key] = { label: key === "other" ? "Other" : AGENTS[key as AgentId].label }
+    config[key] = {
+      label: key === "other" ? "Other" : AGENTS[key as AgentId].label,
+    }
   }
 
   const data = series.points.map((point) => {
@@ -138,7 +156,10 @@ function buildSeriesData(series: TimeSeries, metric: SeriesMetric) {
 function formatBucketTick(t: number, bucketMs: number): string {
   const date = new Date(t)
   if (bucketMs < DAY_MS) {
-    return date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    return date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    })
   }
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
@@ -165,9 +186,9 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div
-        className="flex h-3 w-full overflow-hidden rounded-full"
+        className="flex h-2 w-full gap-0.5"
         role="img"
         aria-label={parts
           .map((p) => `${p.label} ${formatTokens(p.value)}`)
@@ -176,20 +197,26 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
         {parts.map((part) => (
           <div
             key={part.key}
-            style={{ width: `${(part.value / total) * 100}%`, background: part.color }}
+            className="min-w-1 rounded-full"
+            style={{
+              width: `${(part.value / total) * 100}%`,
+              background: part.color,
+            }}
           />
         ))}
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3">
         {parts.map((part) => (
           <div key={part.key} className="flex items-center gap-2">
             <span
-              className="size-2.5 shrink-0 rounded-full"
+              className="size-2 shrink-0 rounded-xs"
               style={{ background: part.color }}
               aria-hidden
             />
-            <dt className="text-muted-foreground">{part.label}</dt>
-            <dd className="ms-auto font-medium tabular-nums">{formatTokens(part.value)}</dd>
+            <dt className="text-[13px] text-muted-foreground">{part.label}</dt>
+            <dd className="ms-auto font-mono text-[13px] tabular-nums">
+              {formatTokens(part.value)}
+            </dd>
           </div>
         ))}
       </dl>
@@ -226,8 +253,18 @@ export function ActivityCalendar({ series }: { series: TimeSeries }) {
   if (week.length > 0) weeks.push(week)
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex w-max gap-0.5" role="img" aria-label="Daily activity for the last year">
+    <div
+      ref={(node) => {
+        // Recent days sit at the right edge; start the scroll there.
+        if (node) node.scrollLeft = node.scrollWidth
+      }}
+      className="overflow-x-auto"
+    >
+      <div
+        className="flex w-max gap-0.5"
+        role="img"
+        aria-label="Daily activity for the last year"
+      >
         {weeks.map((column, wi) => (
           <div key={wi} className="flex flex-col gap-0.5">
             {column.map((day) => (
@@ -239,8 +276,8 @@ export function ActivityCalendar({ series }: { series: TimeSeries }) {
                   background:
                     day.tokens === 0
                       ? "var(--muted)"
-                      : `color-mix(in oklch, var(--primary) ${
-                          20 + Math.round((day.tokens / (max || 1)) * 80)
+                      : `color-mix(in oklch, var(--chart-1) ${
+                          25 + Math.round((day.tokens / (max || 1)) * 75)
                         }%, var(--muted))`,
                 }}
               />

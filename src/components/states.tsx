@@ -1,23 +1,38 @@
-import { AlertCircleIcon, FilterXIcon, InboxIcon } from "lucide-react"
-
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+
+/** Section title row: heading left, optional description below, optional action right. */
+export function SectionHeader({
+  title,
+  description,
+  action,
+}: {
+  title: string
+  description?: string
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="mb-4 flex items-baseline justify-between gap-4">
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-sm font-medium">{title}</h2>
+        {description ? (
+          <p className="text-[13px] text-pretty text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      {action ?? null}
+    </div>
+  )
+}
 
 export function PageSkeleton() {
   return (
-    <div className="flex flex-col gap-4" aria-busy="true" aria-label="Loading">
+    <div className="flex flex-col gap-8" aria-busy="true" aria-label="Loading">
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28 max-lg:hidden" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16" />
+        <Skeleton className="h-16 max-lg:hidden" />
       </div>
       <Skeleton className="h-64" />
       <Skeleton className="h-40" />
@@ -25,20 +40,28 @@ export function PageSkeleton() {
   )
 }
 
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry?: () => void
+}) {
   return (
-    <Alert variant="destructive" role="alert">
-      <AlertCircleIcon />
-      <AlertTitle>Failed to load data</AlertTitle>
-      <AlertDescription>
-        <p>{message}</p>
-        {onRetry ? (
-          <Button variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-            Retry
-          </Button>
-        ) : null}
-      </AlertDescription>
-    </Alert>
+    <div
+      role="alert"
+      className="flex flex-col items-start gap-2 rounded-md border border-destructive/30 p-4"
+    >
+      <p className="text-sm font-medium text-destructive">
+        Failed to load data
+      </p>
+      <p className="text-sm text-muted-foreground">{message}</p>
+      {onRetry ? (
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          Retry
+        </Button>
+      ) : null}
+    </div>
   )
 }
 
@@ -53,19 +76,16 @@ export function EmptyState({
   description?: string
 }) {
   return (
-    <Empty className="border border-dashed">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">{filtered ? <FilterXIcon /> : <InboxIcon />}</EmptyMedia>
-        <EmptyTitle>
-          {title ?? (filtered ? "No matching usage" : "No usage recorded yet")}
-        </EmptyTitle>
-        <EmptyDescription>
-          {description ??
-            (filtered
-              ? "Nothing matches the current date range and agent filters. Widen the range or clear the agent filter."
-              : "Run a sync to collect token usage from your local coding agents.")}
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="flex flex-col items-center gap-1.5 border-t py-24 text-center">
+      <p className="text-sm font-medium">
+        {title ?? (filtered ? "No matching usage" : "No usage recorded yet")}
+      </p>
+      <p className="max-w-sm text-sm text-pretty text-muted-foreground">
+        {description ??
+          (filtered
+            ? "Nothing matches the current date range and agent filters. Widen the range or clear the agent filter."
+            : "Run a sync to collect token usage from your local coding agents.")}
+      </p>
+    </div>
   )
 }

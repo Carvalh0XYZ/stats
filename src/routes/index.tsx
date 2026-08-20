@@ -18,16 +18,17 @@ import {
   formatTokens,
 } from "@/components/data/format"
 import { usePoll } from "@/components/data/use-poll"
-import { ActivityCalendar, TokenMixBar, UsageAreaChart } from "@/components/charts"
-import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+  ActivityCalendar,
+  TokenMixBar,
+  UsageAreaChart,
+} from "@/components/charts"
+import {
+  EmptyState,
+  ErrorState,
+  PageSkeleton,
+  SectionHeader,
+} from "@/components/states"
 
 export const Route = createFileRoute("/")({
   validateSearch: parseStatsSearch,
@@ -47,18 +48,26 @@ function OverviewPage() {
   const filter = Route.useSearch()
   const poll = usePoll<OverviewData>(async () => {
     const yearFilter: StatsFilter = { range: "year", agents: filter.agents }
-    const [overview, series, yearSeries, agents, models, sessions] = await Promise.all([
-      getJson<OverviewStats>(statsUrl("overview", filter)),
-      getJson<TimeSeries>(statsUrl("timeseries", filter)),
-      getJson<TimeSeries>(statsUrl("timeseries", yearFilter)),
-      getJson<BreakdownRow[]>(statsUrl("breakdown", filter, { dimension: "agent" })),
-      getJson<BreakdownRow[]>(statsUrl("breakdown", filter, { dimension: "model" })),
-      getJson<SessionPage>(statsUrl("sessions", filter, { page: "1", pageSize: "5" })),
-    ])
+    const [overview, series, yearSeries, agents, models, sessions] =
+      await Promise.all([
+        getJson<OverviewStats>(statsUrl("overview", filter)),
+        getJson<TimeSeries>(statsUrl("timeseries", filter)),
+        getJson<TimeSeries>(statsUrl("timeseries", yearFilter)),
+        getJson<BreakdownRow[]>(
+          statsUrl("breakdown", filter, { dimension: "agent" })
+        ),
+        getJson<BreakdownRow[]>(
+          statsUrl("breakdown", filter, { dimension: "model" })
+        ),
+        getJson<SessionPage>(
+          statsUrl("sessions", filter, { page: "1", pageSize: "5" })
+        ),
+      ])
     return { overview, series, yearSeries, agents, models, sessions }
   }, JSON.stringify(filter))
 
-  if (poll.error) return <ErrorState message={poll.error} onRetry={poll.refresh} />
+  if (poll.error)
+    return <ErrorState message={poll.error} onRetry={poll.refresh} />
   if (poll.loading || !poll.data) return <PageSkeleton />
 
   const { overview, series, yearSeries, agents, models, sessions } = poll.data
@@ -68,14 +77,18 @@ function OverviewPage() {
   const estimated = overview.hasEstimatedTokens
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="flex flex-col">
+      <h1 className="sr-only">Overview</h1>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
         <Kpi
+          className="pb-4 xl:pb-0"
           label="Total tokens"
           value={formatTokens(overview.tokens.total)}
           note={estimated ? "includes estimated" : undefined}
         />
         <Kpi
+          className="border-l pb-4 pl-4 xl:pb-0"
           label="Priced cost"
           value={formatCost(overview.pricedCostUsd)}
           note={
@@ -84,110 +97,130 @@ function OverviewPage() {
               : undefined
           }
         />
-        <Kpi label="Sessions" value={formatCount(overview.sessions)} />
         <Kpi
+          className="border-t pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pb-4 sm:pl-4 xl:pb-0"
+          label="Sessions"
+          value={formatCount(overview.sessions)}
+        />
+        <Kpi
+          className="border-t border-l pt-4 pl-4 sm:border-l-0 sm:pl-0 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-4"
           label="Active time"
           value={formatDuration(overview.activeTimeMs)}
           note={`${formatCount(overview.activeDays)} active days`}
         />
-        <Kpi label="Cache read share" value={formatShare(overview.cacheReadShare)} />
-        <Kpi label="Output tokens" value={formatTokens(overview.tokens.output)} />
+        <Kpi
+          className="border-t pt-4 sm:border-l sm:pl-4 xl:border-t-0 xl:pt-0"
+          label="Cache read share"
+          value={formatShare(overview.cacheReadShare)}
+        />
+        <Kpi
+          className="border-t border-l pt-4 pl-4 xl:border-t-0 xl:pt-0"
+          label="Output tokens"
+          value={formatTokens(overview.tokens.output)}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Token usage</CardTitle>
-          <CardDescription>Stacked by agent over the selected range</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <UsageAreaChart series={series} metric="tokens" />
-        </CardContent>
-      </Card>
+      <section className="mt-10 border-t pt-8">
+        <SectionHeader
+          title="Token usage"
+          description="Stacked by agent over the selected range"
+        />
+        <UsageAreaChart series={series} metric="tokens" />
+      </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily activity</CardTitle>
-            <CardDescription>Tokens per day, last year</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ActivityCalendar series={yearSeries} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Token mix</CardTitle>
-            <CardDescription>
-              Input, output, cache, and reasoning tokens
-              {estimated ? " (some values estimated)" : ""}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TokenMixBar tokens={overview.tokens} />
-          </CardContent>
-        </Card>
+      <div className="mt-10 grid gap-10 border-t pt-8 lg:grid-cols-2 lg:gap-12">
+        <section className="min-w-0">
+          <SectionHeader
+            title="Daily activity"
+            description="Tokens per day, last year"
+          />
+          <ActivityCalendar series={yearSeries} />
+        </section>
+        <section className="min-w-0">
+          <SectionHeader
+            title="Token mix"
+            description={`Input, output, cache, and reasoning tokens${estimated ? " (some values estimated)" : ""}`}
+          />
+          <TokenMixBar tokens={overview.tokens} />
+        </section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <TopList title="Top agents" rows={agents} to="/agents" filter={filter} />
-        <TopList title="Top models" rows={models} to="/models" filter={filter} />
+      <div className="mt-10 grid gap-10 border-t pt-8 lg:grid-cols-2 lg:gap-12">
+        <TopList
+          title="Top agents"
+          rows={agents}
+          to="/agents"
+          filter={filter}
+        />
+        <TopList
+          title="Top models"
+          rows={models}
+          to="/models"
+          filter={filter}
+        />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent sessions</CardTitle>
-          <CardDescription>
+      <section className="mt-10 border-t pt-8">
+        <SectionHeader
+          title="Recent sessions"
+          action={
             <Link
               to="/sessions"
               search={{ ...filter, page: 1, pageSize: 25 }}
-              className="underline underline-offset-4"
+              className="text-[13px] text-muted-foreground hover:text-foreground"
             >
-              View all {formatCount(sessions.total)} sessions
+              View all {formatCount(sessions.total)} →
             </Link>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col divide-y">
-            {sessions.sessions.map((session) => (
-              <li
-                key={`${session.agent}:${session.sessionId}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
-              >
-                <Badge variant="secondary">{AGENTS[session.agent].label}</Badge>
-                <span className="truncate text-muted-foreground">
-                  {session.project ?? "no project"}
-                </span>
-                <span className="ms-auto tabular-nums">
-                  {formatTokens(session.tokens.total)} tokens
-                </span>
-                <span className="text-muted-foreground tabular-nums">
-                  {formatRelative(session.lastTimestamp)}
-                </span>
-              </li>
-            ))}
-            {sessions.sessions.length === 0 ? (
-              <li className="py-2 text-sm text-muted-foreground">No sessions in range</li>
-            ) : null}
-          </ul>
-        </CardContent>
-      </Card>
+          }
+        />
+        <ul className="flex flex-col">
+          {sessions.sessions.map((session) => (
+            <li
+              key={`${session.agent}:${session.sessionId}`}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2.5 text-sm last:border-b-0"
+            >
+              <span className="font-medium">{AGENTS[session.agent].label}</span>
+              <span className="truncate text-muted-foreground">
+                {session.project ?? "no project"}
+              </span>
+              <span className="ms-auto font-mono text-[13px] tabular-nums">
+                {formatTokens(session.tokens.total)}
+              </span>
+              <span className="w-16 text-right font-mono text-[13px] text-muted-foreground tabular-nums">
+                {formatRelative(session.lastTimestamp)}
+              </span>
+            </li>
+          ))}
+          {sessions.sessions.length === 0 ? (
+            <li className="py-2 text-sm text-muted-foreground">
+              No sessions in range
+            </li>
+          ) : null}
+        </ul>
+      </section>
     </div>
   )
 }
 
-function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
+function Kpi({
+  label,
+  value,
+  note,
+  className,
+}: {
+  label: string
+  value: string
+  note?: string
+  className?: string
+}) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription>{label}</CardDescription>
-        <CardTitle className="text-2xl tabular-nums">{value}</CardTitle>
-      </CardHeader>
-      {note ? (
-        <CardContent>
-          <p className="text-xs text-muted-foreground">{note}</p>
-        </CardContent>
-      ) : null}
-    </Card>
+    <div className={`flex flex-col gap-1 pr-4 ${className ?? ""}`}>
+      <p className="truncate text-[13px] text-muted-foreground">{label}</p>
+      <p className="text-2xl font-semibold tracking-tight tabular-nums">
+        {value}
+      </p>
+      {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
+    </div>
   )
 }
 
@@ -202,40 +235,45 @@ function TopList({
   to: "/agents" | "/models"
   filter: StatsFilter
 }) {
-  const top = rows.slice().sort((a, b) => b.tokens.total - a.tokens.total).slice(0, 5)
+  const top = rows
+    .slice()
+    .sort((a, b) => b.tokens.total - a.tokens.total)
+    .slice(0, 5)
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          <Link to={to} search={filter} className="underline underline-offset-4">
-            View all
+    <section className="min-w-0">
+      <SectionHeader
+        title={title}
+        action={
+          <Link
+            to={to}
+            search={filter}
+            className="text-[13px] text-muted-foreground hover:text-foreground"
+          >
+            View all →
           </Link>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-2">
-          {top.map((row) => (
-            <li key={row.key} className="flex items-center gap-3 text-sm">
-              <span className="w-28 truncate sm:w-40" title={row.label}>
-                {row.label}
-              </span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${Math.max(row.tokenShare * 100, 1)}%` }}
-                />
-              </div>
-              <span className="w-16 text-right tabular-nums">
-                {formatTokens(row.tokens.total)}
-              </span>
-            </li>
-          ))}
-          {top.length === 0 ? (
-            <li className="text-sm text-muted-foreground">No data in range</li>
-          ) : null}
-        </ul>
-      </CardContent>
-    </Card>
+        }
+      />
+      <ul className="flex flex-col gap-3">
+        {top.map((row) => (
+          <li key={row.key} className="flex items-center gap-3 text-sm">
+            <span className="w-28 truncate sm:w-40" title={row.label}>
+              {row.label}
+            </span>
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-chart-1"
+                style={{ width: `${Math.max(row.tokenShare * 100, 1)}%` }}
+              />
+            </div>
+            <span className="w-16 text-right font-mono text-[13px] tabular-nums">
+              {formatTokens(row.tokens.total)}
+            </span>
+          </li>
+        ))}
+        {top.length === 0 ? (
+          <li className="text-sm text-muted-foreground">No data in range</li>
+        ) : null}
+      </ul>
+    </section>
   )
 }

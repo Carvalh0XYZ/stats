@@ -12,15 +12,7 @@ import {
 } from "@/components/data/format"
 import { usePoll } from "@/components/data/use-poll"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -39,7 +31,10 @@ export const Route = createFileRoute("/sessions")({
     return {
       ...parseStatsSearch(input),
       page: Number.isInteger(page) && page > 0 ? page : 1,
-      pageSize: Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 200 ? pageSize : 25,
+      pageSize:
+        Number.isInteger(pageSize) && pageSize > 0 && pageSize <= 200
+          ? pageSize
+          : 25,
     }
   },
   component: SessionsPage,
@@ -52,17 +47,25 @@ function SessionsPage() {
   const poll = usePoll(
     () =>
       getJson<SessionPage>(
-        statsUrl("sessions", filter, { page: String(page), pageSize: String(pageSize) })
+        statsUrl("sessions", filter, {
+          page: String(page),
+          pageSize: String(pageSize),
+        })
       ),
     JSON.stringify(search)
   )
 
-  if (poll.error) return <ErrorState message={poll.error} onRetry={poll.refresh} />
+  if (poll.error)
+    return <ErrorState message={poll.error} onRetry={poll.refresh} />
   if (poll.loading || !poll.data) return <PageSkeleton />
 
   const data = poll.data
   if (data.total === 0) {
-    return <EmptyState filtered={(filter.agents?.length ?? 0) > 0 || filter.range !== "all"} />
+    return (
+      <EmptyState
+        filtered={(filter.agents?.length ?? 0) > 0 || filter.range !== "all"}
+      />
+    )
   }
 
   const pageCount = Math.max(1, Math.ceil(data.total / data.pageSize))
@@ -71,119 +74,150 @@ function SessionsPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sessions</CardTitle>
-        <CardDescription>
-          {formatCount(data.total)} sessions in range · page {data.page} of {pageCount}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {/* Desktop table */}
-        <div className="max-md:hidden">
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-0.5">
+        <h1 className="text-xl font-semibold tracking-tight">Sessions</h1>
+        <p className="text-[13px] text-muted-foreground tabular-nums">
+          {formatCount(data.total)} sessions in range
+        </p>
+      </div>
+
+      {/* Desktop table */}
+      <div className="-mx-4 -my-2 overflow-x-auto whitespace-nowrap max-md:hidden md:-mx-6">
+        <div className="inline-block min-w-full px-4 py-2 align-middle md:px-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Models</TableHead>
-                <TableHead className="text-right">Tokens</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead className="text-right">Duration</TableHead>
+                <TableHead className="whitespace-nowrap">Date</TableHead>
+                <TableHead className="whitespace-nowrap">Agent</TableHead>
+                <TableHead className="whitespace-nowrap">Project</TableHead>
+                <TableHead className="whitespace-nowrap">Models</TableHead>
+                <TableHead className="text-right whitespace-nowrap">
+                  Tokens
+                </TableHead>
+                <TableHead className="text-right whitespace-nowrap">
+                  Cost
+                </TableHead>
+                <TableHead className="text-right whitespace-nowrap">
+                  Duration
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.sessions.map((session) => (
                 <TableRow key={`${session.agent}:${session.sessionId}`}>
-                  <TableCell className="text-muted-foreground tabular-nums">
+                  <TableCell className="font-mono text-[13px] text-muted-foreground tabular-nums">
                     {formatDateTime(session.firstTimestamp)}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{AGENTS[session.agent].label}</Badge>
+                  <TableCell className="font-medium">
+                    {AGENTS[session.agent].label}
                   </TableCell>
-                  <TableCell className="max-w-48 truncate" title={session.project ?? undefined}>
-                    {session.project ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
-                  <TableCell className="max-w-48 truncate" title={session.models.join(", ")}>
-                    {session.models.join(", ") || (
+                  <TableCell
+                    className="max-w-48 truncate"
+                    title={session.project ?? undefined}
+                  >
+                    {session.project ?? (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    <span className="inline-flex items-center gap-1.5">
-                      {formatTokens(session.tokens.total)}
-                      {session.hasEstimatedTokens ? (
-                        <Badge variant="outline">estimated</Badge>
-                      ) : null}
-                    </span>
+                  <TableCell
+                    className="max-w-48 truncate text-muted-foreground"
+                    title={session.models.join(", ")}
+                  >
+                    {session.models.join(", ") || "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
+                  <TableCell className="text-right font-mono text-[13px] tabular-nums">
+                    {formatTokens(session.tokens.total)}
+                    {session.hasEstimatedTokens ? (
+                      <span
+                        className="text-muted-foreground"
+                        title="Includes estimated tokens"
+                      >
+                        {" "}
+                        est.
+                      </span>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-[13px] tabular-nums">
                     <SessionCost session={session} />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatDuration(session.lastTimestamp - session.firstTimestamp)}
+                  <TableCell className="text-right font-mono text-[13px] text-muted-foreground tabular-nums">
+                    {formatDuration(
+                      session.lastTimestamp - session.firstTimestamp
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+      </div>
 
-        {/* Mobile stacked rows */}
-        <ul className="flex flex-col gap-2 md:hidden">
-          {data.sessions.map((session) => (
-            <li key={`${session.agent}:${session.sessionId}`} className="rounded-lg border p-3 text-sm">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="secondary">{AGENTS[session.agent].label}</Badge>
-                <span className="text-muted-foreground tabular-nums">
-                  {formatDateTime(session.firstTimestamp)}
-                </span>
+      {/* Mobile stacked rows */}
+      <ul className="flex flex-col md:hidden">
+        {data.sessions.map((session) => (
+          <li
+            key={`${session.agent}:${session.sessionId}`}
+            className="border-b py-3 text-sm last:border-b-0"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+              <span className="font-medium">{AGENTS[session.agent].label}</span>
+              <span className="ms-auto font-mono text-xs text-muted-foreground tabular-nums">
+                {formatDateTime(session.firstTimestamp)}
+              </span>
+            </div>
+            <p className="mt-1 truncate">{session.project ?? "no project"}</p>
+            <p className="truncate text-muted-foreground">
+              {session.models.join(", ") || "unknown model"}
+            </p>
+            <div className="mt-2 flex flex-wrap justify-between gap-2 font-mono text-[13px] tabular-nums">
+              <span>
+                {formatTokens(session.tokens.total)} tokens
                 {session.hasEstimatedTokens ? (
-                  <Badge variant="outline">estimated</Badge>
+                  <span className="text-muted-foreground"> est.</span>
                 ) : null}
-              </div>
-              <p className="mt-1 truncate">{session.project ?? "no project"}</p>
-              <p className="truncate text-muted-foreground">
-                {session.models.join(", ") || "unknown model"}
-              </p>
-              <div className="mt-2 flex flex-wrap justify-between gap-2 tabular-nums">
-                <span>{formatTokens(session.tokens.total)} tokens</span>
-                <SessionCost session={session} />
-                <span>{formatDuration(session.lastTimestamp - session.firstTimestamp)}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </span>
+              <SessionCost session={session} />
+              <span>
+                {formatDuration(session.lastTimestamp - session.firstTimestamp)}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
 
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            disabled={data.page <= 1}
-            onClick={() => setPage(data.page - 1)}
-            className="min-h-11 md:min-h-8"
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            Page {data.page} / {pageCount}
-          </span>
-          <Button
-            variant="outline"
-            disabled={data.page >= pageCount}
-            onClick={() => setPage(data.page + 1)}
-            className="min-h-11 md:min-h-8"
-          >
-            Next
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={data.page <= 1}
+          onClick={() => setPage(data.page - 1)}
+          className="min-h-11 md:min-h-8"
+        >
+          Previous
+        </Button>
+        <span className="font-mono text-xs text-muted-foreground tabular-nums">
+          {data.page} / {pageCount}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={data.page >= pageCount}
+          onClick={() => setPage(data.page + 1)}
+          className="min-h-11 md:min-h-8"
+        >
+          Next
+        </Button>
+      </div>
+    </div>
   )
 }
 
 function SessionCost({ session }: { session: SessionSummary }) {
-  if (session.pricedCostUsd === 0 && session.unpricedEventCount === session.events) {
+  if (
+    session.pricedCostUsd === 0 &&
+    session.unpricedEventCount === session.events
+  ) {
     return <span className="text-muted-foreground">unpriced</span>
   }
   return <span>{formatCost(session.pricedCostUsd)}</span>

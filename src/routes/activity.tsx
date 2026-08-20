@@ -6,15 +6,6 @@ import { getJson, parseStatsSearch, statsUrl } from "@/components/data/api"
 import { usePoll } from "@/components/data/use-poll"
 import { UsageAreaChart, type SeriesMetric } from "@/components/charts"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 
 export const Route = createFileRoute("/activity")({
   validateSearch: parseStatsSearch,
@@ -35,52 +26,56 @@ function ActivityPage() {
     JSON.stringify(filter)
   )
 
-  if (poll.error) return <ErrorState message={poll.error} onRetry={poll.refresh} />
+  if (poll.error)
+    return <ErrorState message={poll.error} onRetry={poll.refresh} />
   if (poll.loading || !poll.data) return <PageSkeleton />
 
   const series = poll.data
   const hasUsage = series.points.some((p) => p.events > 0)
   if (!hasUsage) {
-    return <EmptyState filtered={(filter.agents?.length ?? 0) > 0 || filter.range !== "all"} />
+    return (
+      <EmptyState
+        filtered={(filter.agents?.length ?? 0) > 0 || filter.range !== "all"}
+      />
+    )
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Activity</CardTitle>
-        <CardDescription>
-          {metric === "tokens"
-            ? "Tokens per bucket, stacked by agent"
-            : metric === "cost"
-              ? "Priced cost per bucket"
-              : "Usage events per bucket"}
-        </CardDescription>
-        <CardAction>
-          <ToggleGroup
-            value={[metric]}
-            onValueChange={(value: unknown[]) => {
-              const next = value[0]
-              if (typeof next === "string") setMetric(next as SeriesMetric)
-            }}
-            variant="outline"
-            spacing={0}
-            aria-label="Chart metric"
-          >
-            {METRICS.map((item) => (
-              <ToggleGroupItem
-                key={item.value}
-                value={item.value}
-                className="min-h-11 md:min-h-8"
-              >
-                {item.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <UsageAreaChart series={series} metric={metric} />
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-xl font-semibold tracking-tight">Activity</h1>
+          <p className="text-[13px] text-muted-foreground">
+            {metric === "tokens"
+              ? "Tokens per bucket, stacked by agent"
+              : metric === "cost"
+                ? "Priced cost per bucket"
+                : "Usage events per bucket"}
+          </p>
+        </div>
+        <div
+          role="group"
+          aria-label="Chart metric"
+          className="flex rounded-md border p-0.5"
+        >
+          {METRICS.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              aria-pressed={metric === item.value}
+              onClick={() => setMetric(item.value)}
+              className={`min-h-10 rounded-[calc(var(--radius)-2px)] px-2.5 text-[13px] focus-visible:ring-2 focus-visible:ring-ring md:min-h-7 ${
+                metric === item.value
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <UsageAreaChart series={series} metric={metric} />
+    </div>
   )
 }

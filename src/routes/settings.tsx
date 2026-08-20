@@ -11,16 +11,8 @@ import {
 } from "@/components/data/api"
 import { formatCount, formatRelative } from "@/components/data/format"
 import { usePoll } from "@/components/data/use-poll"
-import { ErrorState, PageSkeleton } from "@/components/states"
-import { Badge } from "@/components/ui/badge"
+import { ErrorState, PageSkeleton, SectionHeader } from "@/components/states"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -29,21 +21,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 
 export const Route = createFileRoute("/settings")({
   validateSearch: parseStatsSearch,
   component: SettingsPage,
 })
 
-const STATE_BADGE: Record<AgentSourceState, { label: string; variant: "secondary" | "outline" | "destructive" }> = {
-  ok: { label: "ok", variant: "secondary" },
-  "sync-required": { label: "sync required", variant: "outline" },
-  error: { label: "error", variant: "destructive" },
-  "not-found": { label: "not found", variant: "outline" },
+const STATE_META: Record<AgentSourceState, { label: string; dot: string }> = {
+  ok: { label: "ok", dot: "bg-chart-4" },
+  "sync-required": { label: "sync required", dot: "bg-chart-5" },
+  error: { label: "error", dot: "bg-destructive" },
+  "not-found": { label: "not found", dot: "bg-muted-foreground/40" },
 }
 
-const STATE_ORDER: AgentSourceState[] = ["ok", "sync-required", "error", "not-found"]
+// Agents that are not installed carry no signal; the section stays hidden.
+const STATE_ORDER: AgentSourceState[] = ["ok", "sync-required", "error"]
 
 function SettingsPage() {
   const poll = usePoll(async () => {
@@ -54,19 +46,22 @@ function SettingsPage() {
     return { agents, settings }
   }, "settings")
 
-  if (poll.error) return <ErrorState message={poll.error} onRetry={poll.refresh} />
+  if (poll.error)
+    return <ErrorState message={poll.error} onRetry={poll.refresh} />
   if (poll.loading || !poll.data) return <PageSkeleton />
 
   const { agents, settings } = poll.data
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Storage</CardTitle>
-          <CardDescription>Where telemetry-stats keeps its local database</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-2 text-sm">
+    <div className="flex flex-col">
+      <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
+
+      <section className="mt-6">
+        <SectionHeader
+          title="Storage"
+          description="Where telemetry-stats keeps its local database"
+        />
+        <dl className="flex flex-col gap-2 text-sm">
           <InfoRow label="Data directory" value={settings.dataDir} mono />
           <InfoRow label="Timezone" value={settings.timezone} />
           <InfoRow
@@ -77,64 +72,86 @@ function SettingsPage() {
                 : "not fetched — costs stay unpriced until the catalog loads"
             }
           />
-        </CardContent>
-      </Card>
+        </dl>
+      </section>
 
-      <SettingsForm settings={settings} onSaved={poll.refresh} />
+      <section className="mt-10 border-t pt-8">
+        <SettingsForm settings={settings} onSaved={poll.refresh} />
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Sources</CardTitle>
-          <CardDescription>Per-agent collection status</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
+      <section className="mt-10 border-t pt-8">
+        <SectionHeader
+          title="Sources"
+          description="Per-agent collection status"
+        />
+        <div className="flex flex-col gap-6">
           {STATE_ORDER.map((state) => {
             const group = agents.filter((agent) => agent.state === state)
             if (group.length === 0) return null
             return (
-              <section key={state} aria-label={`${STATE_BADGE[state].label} sources`}>
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-medium">
-                  <Badge variant={STATE_BADGE[state].variant}>{STATE_BADGE[state].label}</Badge>
-                  <span className="text-muted-foreground tabular-nums">{group.length}</span>
+              <section
+                key={state}
+                aria-label={`${STATE_META[state].label} sources`}
+              >
+                <h3 className="mb-1 flex items-center gap-2 text-sm font-medium">
+                  <span
+                    className={`size-1.5 rounded-full ${STATE_META[state].dot}`}
+                    aria-hidden
+                  />
+                  {STATE_META[state].label}
+                  <span className="font-mono text-xs font-normal text-muted-foreground tabular-nums">
+                    {group.length}
+                  </span>
                 </h3>
-                <ul className="flex flex-col divide-y">
+                <ul className="flex flex-col">
                   {group.map((agent) => (
                     <li
                       key={agent.id}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
+                      className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2 text-sm last:border-b-0"
                     >
-                      <span className="w-40 truncate font-medium">{agent.label}</span>
-                      <span className="text-muted-foreground">{agent.kind}</span>
-                      <span className="ms-auto tabular-nums">
+                      <span className="w-40 truncate font-medium">
+                        {agent.label}
+                      </span>
+                      <span className="text-[13px] text-muted-foreground">
+                        {agent.kind}
+                      </span>
+                      <span className="ms-auto font-mono text-[13px] tabular-nums">
                         {formatCount(agent.events)} events
                       </span>
                       {agent.warnings > 0 ? (
-                        <span className="text-muted-foreground tabular-nums">
+                        <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
                           {formatCount(agent.warnings)} warnings
                         </span>
                       ) : null}
                       {agent.lastSyncedAt !== null ? (
-                        <span className="text-muted-foreground tabular-nums">
+                        <span className="font-mono text-[13px] text-muted-foreground tabular-nums">
                           synced {formatRelative(agent.lastSyncedAt)}
                         </span>
                       ) : null}
                       {agent.error ? (
-                        <span className="w-full text-destructive">{agent.error}</span>
+                        <span className="w-full text-[13px] text-destructive">
+                          {agent.error}
+                        </span>
                       ) : null}
                     </li>
                   ))}
                 </ul>
-                <Separator className="mt-2" />
               </section>
             )
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     </div>
   )
 }
 
-function SettingsForm({ settings, onSaved }: { settings: AppSettings; onSaved: () => void }) {
+function SettingsForm({
+  settings,
+  onSaved,
+}: {
+  settings: AppSettings
+  onSaved: () => void
+}) {
   const [roots, setRoots] = React.useState(settings.extraRoots)
   const [newRoot, setNewRoot] = React.useState("")
   const [timezone, setTimezone] = React.useState(settings.timezone)
@@ -168,25 +185,27 @@ function SettingsForm({ settings, onSaved }: { settings: AppSettings; onSaved: (
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Collection</CardTitle>
-        <CardDescription>
-          Extra directories to scan for agent logs, and the timezone used for daily totals
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <div>
+      <SectionHeader
+        title="Collection"
+        description="Extra directories to scan for agent logs, and the timezone used for daily totals"
+      />
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <label htmlFor="new-root" className="text-sm font-medium">
             Extra roots
           </label>
           {roots.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No extra roots configured</p>
+            <p className="text-sm text-muted-foreground">
+              No extra roots configured
+            </p>
           ) : (
             <ul className="flex flex-col gap-1">
               {roots.map((root) => (
                 <li key={root} className="flex items-center gap-2 text-sm">
-                  <code className="truncate rounded bg-muted px-1.5 py-0.5">{root}</code>
+                  <code className="truncate rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[13px]">
+                    {root}
+                  </code>
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -212,9 +231,13 @@ function SettingsForm({ settings, onSaved }: { settings: AppSettings; onSaved: (
                 }
               }}
               placeholder="/path/to/agent/logs"
-              className="max-w-md"
+              className="max-w-md font-mono text-[13px]"
             />
-            <Button variant="outline" onClick={addRoot} className="min-h-11 md:min-h-8">
+            <Button
+              variant="outline"
+              onClick={addRoot}
+              className="min-h-11 md:min-h-8"
+            >
               <PlusIcon aria-hidden />
               Add
             </Button>
@@ -244,7 +267,9 @@ function SettingsForm({ settings, onSaved }: { settings: AppSettings; onSaved: (
           </Select>
         </div>
 
-        {saveError ? <p className="text-sm text-destructive">{saveError}</p> : null}
+        {saveError ? (
+          <p className="text-sm text-destructive">{saveError}</p>
+        ) : null}
         <div>
           <Button
             onClick={() => void save()}
@@ -254,16 +279,28 @@ function SettingsForm({ settings, onSaved }: { settings: AppSettings; onSaved: (
             {saving ? "Saving…" : "Save changes"}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
-function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function InfoRow({
+  label,
+  value,
+  mono,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-      <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
-      <span className={mono ? "font-mono text-xs break-all" : undefined}>{value}</span>
+      <dt className="w-32 shrink-0 text-[13px] text-muted-foreground">
+        {label}
+      </dt>
+      <dd className={mono ? "font-mono text-[13px] break-all" : undefined}>
+        {value}
+      </dd>
     </div>
   )
 }

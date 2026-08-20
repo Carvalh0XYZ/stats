@@ -1,18 +1,11 @@
 import * as React from "react"
 import { Link, useNavigate, useSearch } from "@tanstack/react-router"
 import {
-  ActivityIcon,
-  BotIcon,
-  BoxesIcon,
   CheckIcon,
   ChevronDownIcon,
-  FolderIcon,
-  LayoutDashboardIcon,
-  ListIcon,
   Loader2Icon,
   MoonIcon,
   RefreshCwIcon,
-  SettingsIcon,
   SunIcon,
 } from "lucide-react"
 
@@ -24,31 +17,20 @@ import { usePoll } from "@/components/data/use-poll"
 import { formatRelative } from "@/components/data/format"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Separator } from "@/components/ui/separator"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 
 const NAV = [
-  { to: "/", label: "Overview", icon: LayoutDashboardIcon },
-  { to: "/activity", label: "Activity", icon: ActivityIcon },
-  { to: "/agents", label: "Agents", icon: BotIcon },
-  { to: "/models", label: "Models", icon: BoxesIcon },
-  { to: "/projects", label: "Projects", icon: FolderIcon },
-  { to: "/sessions", label: "Sessions", icon: ListIcon },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
+  { to: "/", label: "Overview" },
+  { to: "/activity", label: "Activity" },
+  { to: "/agents", label: "Agents" },
+  { to: "/models", label: "Models" },
+  { to: "/projects", label: "Projects" },
+  { to: "/sessions", label: "Sessions" },
+  { to: "/settings", label: "Settings" },
 ] as const
 
 const RANGE_LABELS: Record<TimeRange, string> = {
@@ -56,73 +38,101 @@ const RANGE_LABELS: Record<TimeRange, string> = {
   "7d": "7d",
   "30d": "30d",
   "90d": "90d",
-  year: "Year",
+  year: "1y",
   all: "All",
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <AppHeader />
-        <div className="flex-1 overflow-x-hidden p-4 md:p-6">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="flex min-h-svh flex-col">
+      <AppHeader />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-5 pb-16 md:px-6 md:pt-6">
+        <Toolbar />
+        {children}
+      </main>
+    </div>
   )
 }
 
-function AppSidebar() {
+function useFilter(): StatsFilter {
   const search = useSearch({ strict: false }) as Partial<StatsFilter>
-  const filter: StatsFilter = {
+  return {
     range: search.range ?? "30d",
     agents: search.agents,
     from: search.from,
     to: search.to,
   }
-  return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <ActivityIcon className="size-5" aria-hidden />
-          <span className="text-sm font-semibold">Telemetry Stats</span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {NAV.map((item) => (
-                <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton
-                    className="min-h-11 md:min-h-8"
-                    render={
-                      <Link
-                        to={item.to}
-                        search={
-                          item.to === "/sessions"
-                            ? { ...filter, page: 1, pageSize: 25 }
-                            : filter
-                        }
-                        activeProps={{ "data-active": true }}
-                        activeOptions={{ exact: item.to === "/" }}
-                      >
-                        <item.icon aria-hidden />
-                        <span>{item.label}</span>
-                      </Link>
-                    }
-                  />
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
 }
 
 function AppHeader() {
+  const filter = useFilter()
+  return (
+    <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 md:px-6">
+        <Link
+          to="/"
+          search={filter}
+          className="flex items-center gap-2.5"
+          aria-label="Telemetry Stats overview"
+        >
+          <svg viewBox="0 0 114.6 115" className="size-5" fill="currentColor" aria-hidden>
+            <path d="M28.3 17.8C26.8 17.8 26.1 15.9 27.4 14.9C34.3 10.6 43.7 5.8 57.3 5.8C70.9 5.8 80.3 10.6 87.2 14.9C88.5 15.9 87.8 17.8 86.3 17.8Z" />
+            <path d="M19.8 22.9H94.8Q96.3 22.9 97.04 24.2Q100.1 27.95 101.76 32.5Q102.5 33.8 101 33.8H77.3C71.3 33.8 68.6 32 65.8 31C63 30 61.4 29.2 57.3 29.2C53.2 29.2 51.6 30 48.8 31C46 32 43.3 33.8 37.3 33.8H13.6Q12.1 33.8 12.84 32.5Q14.5 27.95 17.56 24.2Q18.3 22.9 19.8 22.9Z" />
+            <path d="M34.2 38.8C35.6 38.8 36.3 40.3 35.6 41.4C34.7 42.6 33.4 45.4 32.9 46.9C32.4 48.3 30.8 49.3 29.9 49.3H7.8C7 49.3 6.3 48.5 6.4 47.2C6.7 45.2 7.4 42.1 8.1 40C8.4 39.35 9.1 38.8 9.55 38.8Z" />
+            <path d="M80.4 38.8H105.05C105.75 38.8 106.2 39.35 106.5 40C107.2 42.1 107.9 45.2 108.2 47.2C108.3 48.5 107.6 49.3 106.8 49.3H84.7C83.8 49.3 82.2 48.3 81.7 46.9C81.2 45.4 79.9 42.6 79 41.4C78.3 40.3 79 38.8 80.4 38.8Z" />
+            <path d="M6.8 54.5H107.8Q109.3 54.5 109.3 56L109.3 61.9Q109.3 63.4 107.8 63.4H6.8Q5.3 63.4 5.3 61.9L5.3 56Q5.3 54.5 6.8 54.5Z" />
+            <path d="M8.3 68.3H106.3C107.5 68.3 107.97 69.36 107.6 70.5L106.25 74.7C105.88 75.84 106.25 76.1 105.05 76.1H9.55C8.35 76.1 8.72 75.84 8.35 74.7L7 70.5C6.63 69.36 7.1 68.3 8.3 68.3Z" />
+            <path d="M14 81.5H100.6C101.8 81.5 102.56 83.35 101.9 84.35L99.55 87.9C98.89 88.9 99.65 88.7 98.45 88.7H16.15C14.95 88.7 15.71 88.9 15.05 87.9L12.7 84.35C12.04 83.35 12.8 81.5 14 81.5Z" />
+            <path d="M24.2 93.5H90.4C91.6 93.5 92.27 95.83 91.35 96.6L88.7 98.8C87.78 99.57 88.9 99.3 87.7 99.3H26.9C25.7 99.3 26.82 99.57 25.9 98.8L23.25 96.6C22.33 95.83 23 93.5 24.2 93.5Z" />
+            <path d="M45.6 104.5H69C70.7 104.5 71.2 107.2 69.3 107.5C66 108.3 61.9 108.9 57.3 108.9C52.7 108.9 48.6 108.3 45.3 107.5C43.4 107.2 43.9 104.5 45.6 104.5Z" />
+          </svg>
+          <span className="text-sm font-semibold tracking-tight">
+            Telemetry Stats
+          </span>
+        </Link>
+        <span
+          className="text-sm text-muted-foreground max-sm:hidden"
+          aria-hidden
+        >
+          /
+        </span>
+        <span className="font-mono text-xs text-muted-foreground max-sm:hidden">
+          local
+        </span>
+        <div className="ms-auto flex items-center gap-1.5">
+          <SyncControl />
+          <ThemeToggle />
+        </div>
+      </div>
+      <nav
+        aria-label="Primary"
+        className="mx-auto w-full max-w-6xl overflow-x-auto px-1 md:px-3"
+      >
+        <ul className="flex">
+          {NAV.map((item) => (
+            <li key={item.to}>
+              <Link
+                to={item.to}
+                search={
+                  item.to === "/sessions"
+                    ? { ...filter, page: 1, pageSize: 25 }
+                    : filter
+                }
+                activeProps={{ "data-active": true }}
+                activeOptions={{ exact: item.to === "/" }}
+                className="relative flex h-11 items-center px-3 text-sm whitespace-nowrap text-muted-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:bg-foreground after:opacity-0 hover:text-foreground data-active:text-foreground data-active:after:opacity-100"
+              >
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </header>
+  )
+}
+
+function Toolbar() {
   const search = useSearch({ strict: false }) as Partial<StatsFilter>
   const navigate = useNavigate()
   const range = search.range ?? "30d"
@@ -152,36 +162,30 @@ function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b bg-background/95 px-4 py-2 backdrop-blur">
-      <SidebarTrigger className="min-h-11 min-w-11 md:min-h-8 md:min-w-8" />
-      <Separator orientation="vertical" className="hidden h-6 md:block" />
-      <ToggleGroup
-        value={[range]}
-        onValueChange={(value: unknown[]) => {
-          const next = value[0]
-          if (typeof next === "string") setRange(next as TimeRange)
-        }}
-        variant="outline"
-        spacing={0}
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+      <AgentFilter selected={agents} onChange={setAgents} />
+      <div
+        role="group"
         aria-label="Date range"
+        className="flex rounded-md border p-0.5"
       >
         {TIME_RANGES.map((value) => (
-          <ToggleGroupItem
+          <button
             key={value}
-            value={value}
-            className="min-h-11 md:min-h-8"
-            aria-label={`Last ${RANGE_LABELS[value]}`}
+            type="button"
+            aria-pressed={range === value}
+            onClick={() => setRange(value)}
+            className={`min-h-10 rounded-[calc(var(--radius)-2px)] px-2.5 text-[13px] tabular-nums focus-visible:ring-2 focus-visible:ring-ring md:min-h-7 ${
+              range === value
+                ? "bg-muted font-medium text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
             {RANGE_LABELS[value]}
-          </ToggleGroupItem>
+          </button>
         ))}
-      </ToggleGroup>
-      <AgentFilter selected={agents} onChange={setAgents} />
-      <div className="ms-auto flex items-center gap-2">
-        <SyncControl />
-        <ThemeToggle />
       </div>
-    </header>
+    </div>
   )
 }
 
@@ -199,7 +203,9 @@ function AgentFilter({
 
   const toggle = (id: AgentId) => {
     onChange(
-      selected.includes(id) ? selected.filter((it) => it !== id) : [...selected, id]
+      selected.includes(id)
+        ? selected.filter((it) => it !== id)
+        : [...selected, id]
     )
   }
 
@@ -207,14 +213,18 @@ function AgentFilter({
     <Popover>
       <PopoverTrigger
         render={
-          <Button variant="outline" className="min-h-11 md:min-h-8">
-            Agents
+          <Button variant="outline" className="min-h-11 text-[13px] md:min-h-8">
             {selected.length > 0 ? (
-              <span className="rounded-full bg-primary px-1.5 text-xs text-primary-foreground tabular-nums">
-                {selected.length}
+              <span>
+                Agents{" "}
+                <span className="text-muted-foreground tabular-nums">
+                  · {selected.length}
+                </span>
               </span>
-            ) : null}
-            <ChevronDownIcon aria-hidden />
+            ) : (
+              "All agents"
+            )}
+            <ChevronDownIcon className="text-muted-foreground" aria-hidden />
           </Button>
         }
       />
@@ -226,7 +236,11 @@ function AgentFilter({
           aria-label="Filter agents"
           className="mb-2"
         />
-        <div className="max-h-72 overflow-y-auto" role="listbox" aria-multiselectable="true">
+        <div
+          className="max-h-72 overflow-y-auto"
+          role="listbox"
+          aria-multiselectable="true"
+        >
           {visible.map((id) => {
             const active = selected.includes(id)
             return (
@@ -247,7 +261,9 @@ function AgentFilter({
             )
           })}
           {visible.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">No agents match</p>
+            <p className="px-2 py-3 text-sm text-muted-foreground">
+              No agents match
+            </p>
           ) : null}
         </div>
         {selected.length > 0 ? (
@@ -282,20 +298,24 @@ function SyncControl() {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2.5">
       {finishedAt !== null ? (
-        <span className="hidden text-xs text-muted-foreground tabular-nums sm:inline">
-          Updated {formatRelative(finishedAt)}
+        <span className="hidden font-mono text-xs text-muted-foreground sm:inline">
+          synced {formatRelative(finishedAt)}
         </span>
       ) : null}
       <Button
         variant="outline"
+        size="sm"
         onClick={() => void start()}
         disabled={running}
         className="min-h-11 md:min-h-8"
       >
         {running ? (
-          <Loader2Icon className="animate-spin motion-reduce:animate-none" aria-hidden />
+          <Loader2Icon
+            className="animate-spin motion-reduce:animate-none"
+            aria-hidden
+          />
         ) : (
           <RefreshCwIcon aria-hidden />
         )}
