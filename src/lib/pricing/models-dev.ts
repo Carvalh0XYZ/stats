@@ -35,6 +35,13 @@ export interface PricingCatalog {
   byProviderModel: Map<string, ModelRates>
   /** model → rates, only when exactly one provider defines that model id */
   byModel: Map<string, ModelRates>
+  /**
+   * Trailing model-id segment → consensus rates. Aggregators republish
+   * first-party models as "vendor/model" ids; when one rate tuple is the
+   * strict plurality across every row sharing the segment, that consensus
+   * prices models the first-party provider no longer lists.
+   */
+  byModelPart: Map<string, ModelRates>
   fetchedAt: number
 }
 
@@ -47,6 +54,7 @@ function parseCatalog(raw: unknown, fetchedAt: number): PricingCatalog | null {
   if (!parsed.success) return null
   const byProviderModel = new Map<string, ModelRates>()
   const modelCounts = new Map<string, ModelRates | null>()
+  const partVotes = new Map<string, Map<string, { rates: ModelRates; count: number }>>()
   for (const [provider, entry] of Object.entries(parsed.data)) {
     for (const [model, definition] of Object.entries(entry.models)) {
       const cost = definition.cost
@@ -62,13 +70,30 @@ function parseCatalog(raw: unknown, fetchedAt: number): PricingCatalog | null {
       const key = normalizeKey(model)
       // null marks a model id defined by several providers → ambiguous.
       modelCounts.set(key, modelCounts.has(key) ? null : rates)
+      const part = key.split("/").at(-1)!
+      const votes = partVotes.get(part) ?? new Map<string, { rates: ModelRates; count: number }>()
+      partVotes.set(part, votes)
+      const ballot = [rates.input, rates.output, rates.cacheRead, rates.cacheWrite, rates.reasoning]
+        .map((value) => value.toFixed(9))
+        .join(":")
+      const vote = votes.get(ballot)
+      if (vote) vote.count++
+      else votes.set(ballot, { rates, count: 1 })
     }
   }
   const byModel = new Map<string, ModelRates>()
   for (const [model, rates] of modelCounts) {
     if (rates) byModel.set(model, rates)
   }
-  return { byProviderModel, byModel, fetchedAt }
+  const byModelPart = new Map<string, ModelRates>()
+  for (const [part, votes] of partVotes) {
+    const ranked = [...votes.values()].sort((a, b) => b.count - a.count)
+    // Only a strict plurality is a consensus; a tie stays unpriced.
+    if (ranked[0] && (ranked.length === 1 || ranked[0].count > ranked[1].count)) {
+      byModelPart.set(part, ranked[0].rates)
+    }
+  }
+  return { byProviderModel, byModel, byModelPart, fetchedAt }
 }
 
 /**
@@ -110,7 +135,10 @@ async function readCache(cachePath: string): Promise<PricingCatalog | null> {
   }
 }
 
-/** Exact provider+model lookup, then unambiguous model-only lookup. */
+/**
+ * Exact provider+model lookup, then unambiguous model-only lookup, then the
+ * cross-provider consensus for the model id's trailing segment.
+ */
 export function findRates(
   catalog: PricingCatalog,
   provider: string | null,
@@ -122,7 +150,11 @@ export function findRates(
     const exact = catalog.byProviderModel.get(`${normalizeKey(provider)}\u0000${modelKey}`)
     if (exact) return exact
   }
-  return catalog.byModel.get(modelKey) ?? null
+  return (
+    catalog.byModel.get(modelKey) ??
+    catalog.byModelPart.get(modelKey.split("/").at(-1)!) ??
+    null
+  )
 }
 
 export function priceTokens(rates: ModelRates, tokens: TokenBreakdown): number {

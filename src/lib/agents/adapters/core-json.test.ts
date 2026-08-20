@@ -28,7 +28,8 @@ describe("whole-file JSON adapters", () => {
     await json(path, { id: "chat", startTime: "2026-01-02T00:00:00Z", messages: [{ id: "m", role: "assistant", timestamp: "2026-01-02T00:00:01Z", model: "gemini-3", content: "secret", tokens: { input: 8, output: 4, cached: 2, thoughts: 3 } }] })
     const source = await first(geminiCliAdapter, home, { GEMINI_CLI_HOME: geminiHome })
     const event = (await geminiCliAdapter.parse(source, parseContext())).events[0]
-    expect(event?.tokens).toEqual({ input: 8, output: 4, cacheRead: 2, cacheWrite: 0, reasoning: 3 })
+    // Gemini's input count includes cached content tokens; cached is split out.
+    expect(event?.tokens).toEqual({ input: 6, output: 4, cacheRead: 2, cacheWrite: 0, reasoning: 3 })
     expect(JSON.stringify(event)).not.toContain("secret")
   })
 
@@ -47,5 +48,18 @@ describe("whole-file JSON adapters", () => {
     await json(path, { model: "claude-sonnet", providerLock: "anthropic", providerLockTimestamp: "2026-01-02T00:00:00Z", tokenUsage: { inputTokens: 10, outputTokens: 4, cacheReadTokens: 2, cacheCreationTokens: 3, thinkingTokens: 1 } })
     const source = await first(droidAdapter, home)
     expect((await droidAdapter.parse(source, parseContext())).events[0]).toMatchObject({ project: "my-project", tokens: { input: 10, output: 4, cacheRead: 2, cacheWrite: 3, reasoning: 1 } })
+  })
+
+  test("Droid reduces custom BYOK labels to catalog model ids", async () => {
+    const home = await mkdtemp(join(tmpdir(), "stats-droid-custom-"))
+    const settings = { providerLock: "openai", providerLockTimestamp: "2026-01-02T00:00:00Z", tokenUsage: { inputTokens: 1 } }
+    await json(join(home, ".factory", "sessions", "p", "a.settings.json"), { ...settings, model: "custom:Codex:-GPT-5.4-(high)-5" })
+    await json(join(home, ".factory", "sessions", "p", "b.settings.json"), { ...settings, model: "custom:Claude-Code:-Opus-4.6-(High)-0" })
+    const context: DiscoveryContext = { platform: "darwin", home, env: {}, extraRoots: [] }
+    const models = []
+    for await (const source of droidAdapter.discover(context)) {
+      models.push((await droidAdapter.parse(source, parseContext())).events[0]?.model)
+    }
+    expect(models.sort()).toEqual(["claude-opus-4-6", "gpt-5.4"])
   })
 })
