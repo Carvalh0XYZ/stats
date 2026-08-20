@@ -1,5 +1,17 @@
 import * as React from "react"
-import { ArrowDownIcon, ArrowUpIcon } from "lucide-react"
+import {
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table"
+import type {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+} from "@tanstack/react-table"
+import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon } from "lucide-react"
 
 import type { BreakdownRow } from "@/lib/api/types"
 import {
@@ -9,33 +21,21 @@ import {
   formatShare,
   formatTokens,
 } from "@/components/data/format"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
-type SortKey = "label" | "tokens" | "cost" | "sessions" | "last"
-
-const SORT_VALUE: Record<SortKey, (row: BreakdownRow) => number | string> = {
-  label: (row) => row.label.toLowerCase(),
-  tokens: (row) => row.tokens.total,
-  cost: (row) => row.pricedCostUsd,
-  sessions: (row) => row.sessions,
-  last: (row) => row.lastTimestamp,
+declare module "@tanstack/react-table" {
+  interface ColumnMeta<TData, TValue> {
+    numeric?: boolean
+  }
 }
 
-const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
-  { key: "label", label: "Name" },
-  { key: "tokens", label: "Tokens", numeric: true },
-  { key: "cost", label: "Cost", numeric: true },
-  { key: "sessions", label: "Sessions", numeric: true },
-  { key: "last", label: "Last active", numeric: true },
-]
+const PER_PAGE = 10
 
+/**
+ * Breakdown data grid on the BoardUI data-table pattern: @tanstack/react-table
+ * sorting + pagination inside a rounded card with a muted header band.
+ */
 export function BreakdownTable({
   rows,
   nameLabel,
@@ -43,142 +43,304 @@ export function BreakdownTable({
   rows: BreakdownRow[]
   nameLabel: string
 }) {
-  const [sortKey, setSortKey] = React.useState<SortKey>("tokens")
-  const [descending, setDescending] = React.useState(true)
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: "tokens", desc: true },
+  ])
+  const [pagination, setPagination] = React.useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: PER_PAGE,
+  })
 
-  const sorted = React.useMemo(() => {
-    const value = SORT_VALUE[sortKey]
-    const next = [...rows].sort((a, b) => {
-      const va = value(a)
-      const vb = value(b)
-      const order = va < vb ? -1 : va > vb ? 1 : 0
-      return descending ? -order : order
-    })
-    return next
-  }, [rows, sortKey, descending])
+  const columns = React.useMemo<ColumnDef<BreakdownRow>[]>(
+    () => [
+      {
+        id: "label",
+        accessorFn: (row) => row.label.toLowerCase(),
+        header: nameLabel,
+        cell: ({ row }) => (
+          <span className="block max-w-64 truncate font-medium">
+            {row.original.label}
+            {row.original.hasEstimatedTokens ? (
+              <span
+                className="font-normal text-muted-foreground"
+                title="Includes estimated tokens"
+              >
+                {" "}
+                est.
+              </span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: "tokens",
+        accessorFn: (row) => row.tokens.total,
+        header: "Tokens",
+        meta: { numeric: true },
+        cell: ({ row }) => <TokensCell row={row.original} />,
+      },
+      {
+        id: "cost",
+        accessorFn: (row) => row.pricedCostUsd,
+        header: "Cost",
+        meta: { numeric: true },
+        cell: ({ row }) => <CostCell row={row.original} />,
+      },
+      {
+        id: "sessions",
+        accessorFn: (row) => row.sessions,
+        header: "Sessions",
+        meta: { numeric: true },
+        cell: ({ row }) => formatCount(row.original.sessions),
+      },
+      {
+        id: "last",
+        accessorFn: (row) => row.lastTimestamp,
+        header: "Last active",
+        meta: { numeric: true },
+        cell: ({ row }) => (
+          <span
+            className="text-muted-foreground"
+            title={new Date(row.original.firstTimestamp).toLocaleString()}
+          >
+            {formatRelative(row.original.lastTimestamp)}
+          </span>
+        ),
+      },
+      {
+        id: "share",
+        enableSorting: false,
+        header: "Share",
+        cell: ({ row }) => <ShareBar share={row.original.tokenShare} />,
+      },
+    ],
+    [nameLabel]
+  )
 
-  const toggleSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setDescending(!descending)
-    } else {
-      setSortKey(key)
-      setDescending(key !== "label")
-    }
-  }
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getRowId: (row) => row.key,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  })
+
+  const headers = table.getHeaderGroups()[0].headers
+  const totalPages = table.getPageCount()
 
   return (
-    <>
-      {/* Desktop: semantic sortable table */}
-      <div className="-mx-4 -my-2 overflow-x-auto whitespace-nowrap max-md:hidden md:-mx-6">
-        <div className="inline-block min-w-full px-4 py-2 align-middle md:px-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {COLUMNS.map((column) => (
-                  <TableHead
-                    key={column.key}
-                    aria-sort={
-                      sortKey === column.key
-                        ? descending
-                          ? "descending"
-                          : "ascending"
-                        : "none"
-                    }
-                    className={
-                      column.numeric
-                        ? "text-right whitespace-nowrap"
-                        : "whitespace-nowrap"
-                    }
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleSort(column.key)}
-                      className="inline-flex min-h-8 items-center gap-1 rounded-sm font-medium hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {column.key === "label" ? nameLabel : column.label}
-                      {sortKey === column.key ? (
-                        descending ? (
-                          <ArrowDownIcon className="size-3.5" aria-hidden />
-                        ) : (
-                          <ArrowUpIcon className="size-3.5" aria-hidden />
-                        )
-                      ) : null}
-                    </button>
-                  </TableHead>
-                ))}
-                <TableHead className="whitespace-nowrap">Share</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((row) => (
-                <TableRow key={row.key}>
-                  <TableCell className="max-w-64">
-                    <span className="block truncate font-medium">
-                      {row.label}
-                      {row.hasEstimatedTokens ? (
-                        <span
-                          className="font-normal text-muted-foreground"
-                          title="Includes estimated tokens"
-                        >
-                          {" "}
-                          est.
-                        </span>
-                      ) : null}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-[13px] tabular-nums">
-                    <TokensCell row={row} />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-[13px] tabular-nums">
-                    <CostCell row={row} />
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-[13px] tabular-nums">
-                    {formatCount(row.sessions)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-[13px] text-muted-foreground tabular-nums">
-                    <span title={new Date(row.firstTimestamp).toLocaleString()}>
-                      {formatRelative(row.lastTimestamp)}
-                    </span>
-                  </TableCell>
-                  <TableCell className="w-32">
-                    <ShareBar share={row.tokenShare} />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+    <section
+      className={cn(
+        "flex w-full flex-col rounded-2xl border pt-2",
+        totalPages > 1 ? "pb-3" : "pb-0"
+      )}
+    >
+      <div className="flex flex-col justify-center px-3 py-1">
+        <p className="text-[13px] whitespace-nowrap text-muted-foreground">
+          Total results
+        </p>
+        <p className="text-sm font-medium whitespace-nowrap">
+          {formatCount(rows.length)} {nameLabel.toLowerCase()}s
+        </p>
       </div>
 
-      {/* Mobile: stacked info-complete rows */}
-      <ul className="flex flex-col md:hidden">
-        {sorted.map((row) => (
-          <li key={row.key} className="border-b py-3 last:border-b-0">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate font-medium">{row.label}</span>
-              {row.hasEstimatedTokens ? (
-                <span className="text-xs text-muted-foreground">est.</span>
-              ) : null}
-            </div>
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <MobileStat label="Tokens" value={<TokensCell row={row} />} />
-              <MobileStat label="Cost" value={<CostCell row={row} />} />
-              <MobileStat label="Sessions" value={formatCount(row.sessions)} />
-              <MobileStat
-                label="Last active"
-                value={formatRelative(row.lastTimestamp)}
-              />
-              <MobileStat
-                label="First active"
-                value={formatRelative(row.firstTimestamp)}
-              />
-              <MobileStat label="Share" value={formatShare(row.tokenShare)} />
-            </dl>
-            <ShareBar share={row.tokenShare} className="mt-3" />
-          </li>
-        ))}
+      <div className="mt-2 w-full overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-left">
+          <thead>
+            <tr>
+              {headers.map((header) => {
+                const canSort = header.column.getCanSort()
+                const numeric = header.column.columnDef.meta?.numeric
+                const dir = header.column.getIsSorted()
+                const label = flexRender(
+                  header.column.columnDef.header,
+                  header.getContext()
+                )
+                return (
+                  <th
+                    key={header.id}
+                    aria-sort={
+                      dir === "desc"
+                        ? "descending"
+                        : dir === "asc"
+                          ? "ascending"
+                          : "none"
+                    }
+                    className={cn(
+                      "border-y bg-muted px-3 py-2.5 text-[13px] font-medium whitespace-nowrap text-muted-foreground",
+                      numeric && "text-right"
+                    )}
+                  >
+                    {canSort ? (
+                      <button
+                        type="button"
+                        onClick={header.column.getToggleSortingHandler()}
+                        className="inline-flex cursor-pointer items-center gap-0.5 rounded-sm align-middle hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {label}
+                        <SortChevron dir={dir} />
+                      </button>
+                    ) : (
+                      label
+                    )}
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.map((row) => (
+              <tr
+                key={row.id}
+                className={cn(
+                  "border-b transition-colors duration-150 hover:bg-muted/50",
+                  totalPages <= 1 && "last:border-transparent"
+                )}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className={cn(
+                      "px-3 py-2.5 align-middle text-sm whitespace-nowrap",
+                      cell.column.columnDef.meta?.numeric &&
+                        "text-right font-mono text-[13px] tabular-nums",
+                      cell.column.id === "share" && "w-32"
+                    )}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {totalPages > 1 ? (
+        <Pagination
+          className="px-3 pt-3"
+          page={pagination.pageIndex + 1}
+          totalPages={totalPages}
+          onChange={(p) => table.setPageIndex(p - 1)}
+        />
+      ) : null}
+    </section>
+  )
+}
+
+function SortChevron({ dir }: { dir: false | "asc" | "desc" }) {
+  return (
+    <ChevronDownIcon
+      aria-hidden
+      className={cn(
+        "size-3.5 shrink-0 transition-[transform,color] duration-150",
+        dir === "asc" && "rotate-180",
+        dir ? "text-foreground" : "text-muted-foreground"
+      )}
+    />
+  )
+}
+
+const DOTS = "dots"
+
+function paginationRange(
+  current: number,
+  total: number
+): (number | typeof DOTS)[] {
+  // first + last + current + 2 siblings + 2 dots
+  if (total <= 7)
+    return Array.from({ length: total }, (_, index) => index + 1)
+
+  const leftSibling = Math.max(current - 1, 1)
+  const rightSibling = Math.min(current + 1, total)
+  const showLeftDots = leftSibling > 2
+  const showRightDots = rightSibling < total - 2
+
+  if (!showLeftDots && showRightDots)
+    return [1, 2, 3, 4, 5, DOTS, total]
+  if (showLeftDots && !showRightDots)
+    return [1, DOTS, total - 4, total - 3, total - 2, total - 1, total]
+  return [1, DOTS, leftSibling, current, rightSibling, DOTS, total]
+}
+
+// No transition on the cells: animating background/shadow makes the
+// previously-active number visibly fade out on every page change.
+const cell =
+  "flex size-8 shrink-0 items-center justify-center rounded-lg text-sm"
+
+/** BoardUI pagination: Previous/Next buttons around a windowed page list. */
+function Pagination({
+  page,
+  totalPages,
+  onChange,
+  className,
+}: {
+  page: number
+  totalPages: number
+  onChange: (page: number) => void
+  className?: string
+}) {
+  return (
+    <nav
+      aria-label="Pagination"
+      className={cn("flex w-full items-center justify-between gap-2", className)}
+    >
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page <= 1}
+        onClick={() => onChange(page - 1)}
+      >
+        <ArrowLeftIcon data-icon="inline-start" aria-hidden />
+        <span className="max-sm:sr-only">Previous</span>
+      </Button>
+
+      <ul className="flex min-w-0 items-center gap-0.5">
+        {paginationRange(page, totalPages).map((item, i) =>
+          item === DOTS ? (
+            <li
+              key={`dots-${i}`}
+              aria-hidden
+              className={cn(cell, "text-muted-foreground")}
+            >
+              …
+            </li>
+          ) : (
+            <li key={item}>
+              <button
+                type="button"
+                aria-label={`Go to page ${item}`}
+                aria-current={item === page ? "page" : undefined}
+                onClick={() => onChange(item)}
+                className={cn(
+                  cell,
+                  "cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  item === page
+                    ? "border bg-background font-medium shadow-xs"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {item}
+              </button>
+            </li>
+          )
+        )}
       </ul>
-    </>
+
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+      >
+        <span className="max-sm:sr-only">Next</span>
+        <ArrowRightIcon data-icon="inline-end" aria-hidden />
+      </Button>
+    </nav>
   )
 }
 
@@ -204,10 +366,10 @@ function CostCell({ row }: { row: BreakdownRow }) {
   )
 }
 
-function ShareBar({ share, className }: { share: number; className?: string }) {
+function ShareBar({ share }: { share: number }) {
   return (
     <div
-      className={`h-1 w-full overflow-hidden rounded-full bg-muted ${className ?? ""}`}
+      className="h-1 w-full overflow-hidden rounded-full bg-muted"
       role="img"
       aria-label={`${formatShare(share)} of tokens`}
     >
@@ -215,21 +377,6 @@ function ShareBar({ share, className }: { share: number; className?: string }) {
         className="h-full rounded-full bg-chart-1"
         style={{ width: `${Math.max(share * 100, 1)}%` }}
       />
-    </div>
-  )
-}
-
-function MobileStat({
-  label,
-  value,
-}: {
-  label: string
-  value: React.ReactNode
-}) {
-  return (
-    <div className="flex items-baseline justify-between gap-2">
-      <dt className="text-[13px] text-muted-foreground">{label}</dt>
-      <dd className="font-mono text-[13px] tabular-nums">{value}</dd>
     </div>
   )
 }

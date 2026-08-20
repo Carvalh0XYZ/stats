@@ -21,7 +21,7 @@ import { usePoll } from "@/components/data/use-poll"
 import {
   ActivityCalendar,
   TokenMixBar,
-  UsageAreaChart,
+  UsageChartCard,
 } from "@/components/charts"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
 
@@ -115,14 +115,11 @@ function OverviewPage() {
         />
       </div>
 
-      <Panel
+      <UsageChartCard
         className="mt-8"
-        label="Tokens"
-        value={`${formatTokens(overview.tokens.total)} tokens`}
-        description="Stacked by agent over the selected range"
-      >
-        <UsageAreaChart series={series} metric="tokens" />
-      </Panel>
+        series={series}
+        total={overview.tokens.total}
+      />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Panel

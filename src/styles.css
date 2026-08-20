@@ -1,15 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
-@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,6 +48,8 @@
   --radius-2xl: calc(var(--radius) * 2.66);
   --radius-3xl: calc(var(--radius) * 3.33);
   --radius-4xl: calc(var(--radius) * 4);
+  --color-chart-track: var(--muted);
+  --color-chart-cursor: var(--input);
 }
 
 :root {
@@ -132,5 +134,55 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Motion ported from BoardUI. */
+
+/* Soft fade on an animated number each time its target changes. */
+@keyframes number-fade {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-number-fade {
+  animation: number-fade 220ms ease-out;
+}
+
+/* Heatmap cells pop in softly; a per-cell delay scatters the fill order. */
+@keyframes cell-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.animate-cell-pop {
+  animation: cell-pop 380ms ease-out both;
+}
+
+/* Line chart draws in left→right via a clip-path sweep over the whole plot. */
+@keyframes chart-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.animate-chart-reveal {
+  animation: chart-reveal 1800ms cubic-bezier(0.33, 0, 0.15, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cell-pop,
+  .animate-chart-reveal {
+    animation: none;
   }
 }

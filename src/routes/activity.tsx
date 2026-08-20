@@ -4,7 +4,8 @@ import { createFileRoute } from "@tanstack/react-router"
 import type { TimeSeries } from "@/lib/api/types"
 import { getJson, parseStatsSearch, statsUrl } from "@/components/data/api"
 import { usePoll } from "@/components/data/use-poll"
-import { UsageAreaChart, type SeriesMetric } from "@/components/charts"
+import { UsageChartCard } from "@/components/charts"
+import type { SeriesMetric } from "@/components/charts"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
 
 export const Route = createFileRoute("/activity")({
@@ -47,7 +48,7 @@ function ActivityPage() {
           <h1 className="text-xl font-semibold tracking-tight">Activity</h1>
           <p className="text-[13px] text-muted-foreground">
             {metric === "tokens"
-              ? "Tokens per bucket, stacked by agent"
+              ? "Tokens per bucket over the selected range"
               : metric === "cost"
                 ? "Priced cost per bucket"
                 : "Usage events per bucket"}
@@ -75,7 +76,7 @@ function ActivityPage() {
           ))}
         </div>
       </div>
-      <UsageAreaChart series={series} metric={metric} />
+      <UsageChartCard series={series} metric={metric} />
     </div>
   )
 }
