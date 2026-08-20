@@ -23,12 +23,7 @@ import {
   TokenMixBar,
   UsageAreaChart,
 } from "@/components/charts"
-import {
-  EmptyState,
-  ErrorState,
-  PageSkeleton,
-  SectionHeader,
-} from "@/components/states"
+import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
 
 export const Route = createFileRoute("/")({
   validateSearch: parseStatsSearch,
@@ -120,64 +115,68 @@ function OverviewPage() {
         />
       </div>
 
-      <section className="mt-10 border-t pt-8">
-        <SectionHeader
-          title="Token usage"
-          description="Stacked by agent over the selected range"
-        />
+      <Panel
+        className="mt-8"
+        label="Tokens"
+        value={`${formatTokens(overview.tokens.total)} tokens`}
+        description="Stacked by agent over the selected range"
+      >
         <UsageAreaChart series={series} metric="tokens" />
-      </section>
+      </Panel>
 
-      <div className="mt-10 grid gap-10 border-t pt-8 lg:grid-cols-2 lg:gap-12">
-        <section className="min-w-0">
-          <SectionHeader
-            title="Daily activity"
-            description="Tokens per day, last year"
-          />
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Panel
+          label="Activity"
+          value={`${formatCount(overview.activeDays)} active days`}
+          description="Tokens per day, last year"
+        >
           <ActivityCalendar series={yearSeries} />
-        </section>
-        <section className="min-w-0">
-          <SectionHeader
-            title="Token mix"
-            description={`Input, output, cache, and reasoning tokens${estimated ? " (some values estimated)" : ""}`}
-          />
+        </Panel>
+        <Panel
+          label="Token mix"
+          value={formatTokens(overview.tokens.total)}
+          description={`Input, output, cache, and reasoning tokens${estimated ? " (some values estimated)" : ""}`}
+        >
           <TokenMixBar tokens={overview.tokens} />
-        </section>
+        </Panel>
       </div>
 
-      <div className="mt-10 grid gap-10 border-t pt-8 lg:grid-cols-2 lg:gap-12">
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <TopList
-          title="Top agents"
+          label="Agents"
+          unit="agents"
           rows={agents}
           to="/agents"
           filter={filter}
         />
         <TopList
-          title="Top models"
+          label="Models"
+          unit="models"
           rows={models}
           to="/models"
           filter={filter}
         />
       </div>
 
-      <section className="mt-10 border-t pt-8">
-        <SectionHeader
-          title="Recent sessions"
-          action={
-            <Link
-              to="/sessions"
-              search={{ ...filter, page: 1, pageSize: 25 }}
-              className="text-[13px] text-muted-foreground hover:text-foreground"
-            >
-              View all {formatCount(sessions.total)} →
-            </Link>
-          }
-        />
+      <Panel
+        className="mt-4"
+        label="Sessions"
+        value={`${formatCount(sessions.total)} sessions`}
+        action={
+          <Link
+            to="/sessions"
+            search={{ ...filter, page: 1, pageSize: 25 }}
+            className="text-[13px] text-muted-foreground hover:text-foreground"
+          >
+            View all →
+          </Link>
+        }
+      >
         <ul className="flex flex-col">
           {sessions.sessions.map((session) => (
             <li
               key={`${session.agent}:${session.sessionId}`}
-              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2.5 text-sm last:border-b-0"
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b py-2.5 text-sm last:border-b-0 last:pb-0"
             >
               <span className="font-medium">{AGENTS[session.agent].label}</span>
               <span className="truncate text-muted-foreground">
@@ -197,7 +196,7 @@ function OverviewPage() {
             </li>
           ) : null}
         </ul>
-      </section>
+      </Panel>
     </div>
   )
 }
@@ -224,13 +223,54 @@ function Kpi({
   )
 }
 
+/** Rounded stat card: small muted label, big value, optional description/action. */
+function Panel({
+  label,
+  value,
+  description,
+  action,
+  className,
+  children,
+}: {
+  label: string
+  value?: string
+  description?: string
+  action?: React.ReactNode
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className={`min-w-0 rounded-2xl bg-muted/50 p-5 ${className ?? ""}`}>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <p className="text-[13px] text-muted-foreground">{label}</p>
+          {value ? (
+            <p className="text-xl font-semibold tracking-tight tabular-nums">
+              {value}
+            </p>
+          ) : null}
+          {description ? (
+            <p className="text-[13px] text-pretty text-muted-foreground">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {action ?? null}
+      </div>
+      {children}
+    </section>
+  )
+}
+
 function TopList({
-  title,
+  label,
+  unit,
   rows,
   to,
   filter,
 }: {
-  title: string
+  label: string
+  unit: string
   rows: BreakdownRow[]
   to: "/agents" | "/models"
   filter: StatsFilter
@@ -240,19 +280,19 @@ function TopList({
     .sort((a, b) => b.tokens.total - a.tokens.total)
     .slice(0, 5)
   return (
-    <section className="min-w-0">
-      <SectionHeader
-        title={title}
-        action={
-          <Link
-            to={to}
-            search={filter}
-            className="text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            View all →
-          </Link>
-        }
-      />
+    <Panel
+      label={label}
+      value={`${formatCount(rows.length)} ${unit}`}
+      action={
+        <Link
+          to={to}
+          search={filter}
+          className="text-[13px] text-muted-foreground hover:text-foreground"
+        >
+          View all →
+        </Link>
+      }
+    >
       <ul className="flex flex-col gap-3">
         {top.map((row) => (
           <li key={row.key} className="flex items-center gap-3 text-sm">
@@ -274,6 +314,6 @@ function TopList({
           <li className="text-sm text-muted-foreground">No data in range</li>
         ) : null}
       </ul>
-    </section>
+    </Panel>
   )
 }

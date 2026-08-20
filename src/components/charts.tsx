@@ -186,9 +186,9 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <div
-        className="flex h-2 w-full gap-0.5"
+        className="flex h-1.5 w-full gap-px overflow-hidden rounded-full bg-muted"
         role="img"
         aria-label={parts
           .map((p) => `${p.label} ${formatTokens(p.value)}`)
@@ -197,7 +197,7 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
         {parts.map((part) => (
           <div
             key={part.key}
-            className="min-w-1 rounded-full"
+            className="h-full min-w-1 shrink-0"
             style={{
               width: `${(part.value / total) * 100}%`,
               background: part.color,
@@ -205,17 +205,20 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
           />
         ))}
       </div>
-      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm sm:grid-cols-3">
+      <dl className="flex flex-col">
         {parts.map((part) => (
-          <div key={part.key} className="flex items-center gap-2">
+          <div key={part.key} className="flex items-center gap-2 py-[5px]">
             <span
-              className="size-2 shrink-0 rounded-xs"
+              className="size-2.5 shrink-0 rounded-[3px]"
               style={{ background: part.color }}
               aria-hidden
             />
-            <dt className="text-[13px] text-muted-foreground">{part.label}</dt>
-            <dd className="ms-auto font-mono text-[13px] tabular-nums">
+            <dt className="min-w-0 flex-1 truncate text-sm">{part.label}</dt>
+            <dd className="font-mono text-[13px] text-muted-foreground tabular-nums">
               {formatTokens(part.value)}
+            </dd>
+            <dd className="w-14 text-right text-[13px] font-medium tabular-nums">
+              {((part.value / total) * 100).toFixed(1)}%
             </dd>
           </div>
         ))}
