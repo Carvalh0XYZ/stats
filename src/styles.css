@@ -137,7 +137,7 @@
   }
 }
 
-/* Motion ported from BoardUI. */
+/* Shared motion for dashboard numbers, heatmap cells, and chart reveals. */
 
 /* Soft fade on an animated number each time its target changes. */
 @keyframes number-fade {

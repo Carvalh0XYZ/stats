@@ -230,8 +230,8 @@ function deltaOf(
 }
 
 /**
- * BoardUI KPI tile (stat-cards.tsx): icon in a bordered chip top-left, label
- * over a big tabular value with a delta Chip and an optional note Chip beside.
+ * KPI tile: icon in a bordered chip top-left, delta Chip top-right, label
+ * over a big tabular value with an optional note Chip beside it.
  */
 function StatTile({
   icon: Icon,
@@ -280,7 +280,7 @@ const CHIP_COLORS: Record<ChipColor, string> = {
   neutral: "bg-muted text-muted-foreground",
 }
 
-/** BoardUI Chip (chip.tsx): tinted label pill next to a headline value. */
+/** Tinted label pill next to a headline value. */
 function Chip({
   color = "neutral",
   children,

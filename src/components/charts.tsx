@@ -98,7 +98,7 @@ export function TokenMixBar({ tokens }: { tokens: TokenTotals }) {
   )
 }
 
-// --- Contributions heat grid, ported from BoardUI (contributions-card.tsx) ---
+// --- Contributions heat grid ---
 
 const GRID_ROWS = 7
 
@@ -136,9 +136,9 @@ export interface ContributionDatum {
 }
 
 /**
- * BoardUI heatmap grid — quantized accent ramp, a tooltip per cell, and a
- * scattered pop-in on mount. `data` is sequential days, column-major
- * (7 rows per week column).
+ * Heatmap grid — quantized accent ramp, a tooltip per cell, and a scattered
+ * pop-in on mount. `data` is sequential days, column-major (7 rows per week
+ * column).
  */
 export function ContributionsGrid({
   data,
@@ -249,7 +249,7 @@ export function ActivityCalendar({ series }: { series: TimeSeries }) {
   )
 }
 
-// --- Usage line chart, ported from BoardUI (tokens-chart-card.tsx) ---
+// --- Usage line chart ---
 
 const METRIC_LABELS: Record<SeriesMetric, string> = {
   tokens: "Tokens",
@@ -399,7 +399,7 @@ function buildSegments(series: { value: number }[]) {
 }
 
 /**
- * BoardUI AI-profile chart card: an accent line over a gradient area, grey
+ * Chart card: an accent line over a gradient area, grey
  * dashed baseline through zero runs, and a count-up headline that rolls to
  * the hovered point's value.
  */
@@ -456,7 +456,7 @@ export function UsageChartCard({
         className
       )}
     >
-      {/* Header — overlaps the top of the plot like the BoardUI card */}
+      {/* Header — overlaps the top of the plot */}
       <div className="relative z-10 -mb-8 flex w-full px-5 pt-1">
         <div className="flex flex-col gap-0.5">
           <p className="text-[13px] whitespace-nowrap text-muted-foreground">

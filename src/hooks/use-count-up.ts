@@ -5,7 +5,6 @@ const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3)
 /**
  * Rolls the displayed number from its current value to `target` with an
  * ease-out curve, so headline figures animate when the hovered point changes.
- * Ported from BoardUI.
  */
 export function useCountUp(target: number, duration = 320) {
   const [display, setDisplay] = useState(target)

@@ -33,8 +33,8 @@ declare module "@tanstack/react-table" {
 const PER_PAGE = 10
 
 /**
- * Breakdown data grid on the BoardUI data-table pattern: @tanstack/react-table
- * sorting + pagination inside a rounded card with a muted header band.
+ * Breakdown data grid: @tanstack/react-table sorting + pagination inside a
+ * rounded card with a muted header band.
  */
 export function BreakdownTable({
   rows,
@@ -281,7 +281,7 @@ function paginationRange(
 const cell =
   "flex size-8 shrink-0 items-center justify-center rounded-lg text-sm"
 
-/** BoardUI pagination: Previous/Next buttons around a windowed page list. */
+/** Previous/Next buttons around a windowed page list. */
 function Pagination({
   page,
   totalPages,
