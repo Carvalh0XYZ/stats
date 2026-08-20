@@ -5,7 +5,7 @@ scans the agent logs on your machine, stores normalized usage in a local
 SQLite database, and opens a dashboard in your browser. Nothing leaves your
 machine.
 
-![The Telemetry Stats dashboard](.github/preview.png)
+![The Telemetry Stats dashboard](https://raw.githubusercontent.com/telemetry-dev/stats/main/.github/preview.png)
 
 ## Usage
 

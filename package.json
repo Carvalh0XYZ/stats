@@ -1,6 +1,10 @@
 {
   "name": "@telemetry-dev/stats",
-  "version": "0.1.1",
+  "version": "0.1.2",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/telemetry-dev/stats.git"
+  },
   "description": "Local web dashboard for token usage across AI coding agents",
   "license": "MIT",
   "type": "module",
