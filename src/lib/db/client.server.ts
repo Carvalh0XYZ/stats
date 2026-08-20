@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { openDatabase } from "./schema"
 import { dataDir } from "./paths.server"
 import type { UsageEvent } from "../usage/types"
+import { canonicalProject } from "../usage/project.server"
 
 let db: Database | null = null
 
@@ -88,7 +89,7 @@ export function insertEvents(database: Database, events: UsageEvent[]): number {
       event.provider,
       event.model,
       event.sessionId,
-      event.project,
+      canonicalProject(event.project),
       event.timestamp,
       event.localDate,
       event.tokens.input,

@@ -1,6 +1,7 @@
 import type { Database } from "better-sqlite3"
 import { AGENTS, AGENT_IDS, isAgentId, type AgentId } from "../agents/registry"
 import { ADAPTERS } from "../agents"
+import { canonicalProject, displayProject } from "../usage/project.server"
 import { getDb } from "../db/client.server"
 import type {
   AgentStatus,
@@ -243,22 +244,14 @@ export function getBreakdown(filter: StatsFilter, dimension: BreakdownDimension)
        FROM usage_events ${where.sql}
        GROUP BY key ORDER BY (SUM(input_tokens) + SUM(output_tokens) + SUM(cache_read_tokens) + SUM(cache_write_tokens) + SUM(reasoning_tokens)) DESC`,
     )
-    .all(...where.params) as (TokenSumRow & {
-    key: string
-    pricedCost: number | null
-    unpricedEvents: number | null
-    events: number
-    sessions: number
-    first: number
-    last: number
-    hasEstimated: number | null
-  })[]
-  const grandTotal = rows.reduce((sum, row) => sum + tokenTotalsOf(row).total, 0)
-  return rows.map(row => {
+    .all(...where.params) as BreakdownSumRow[]
+  const merged = dimension === "project" ? mergeProjectRows(rows) : rows
+  const grandTotal = merged.reduce((sum, row) => sum + tokenTotalsOf(row).total, 0)
+  return merged.map(row => {
     const tokens = tokenTotalsOf(row)
     return {
       key: row.key,
-      label: dimension === "agent" && isAgentId(row.key) ? AGENTS[row.key].label : row.key,
+      label: labelOf(dimension, row.key),
       tokens,
       pricedCostUsd: row.pricedCost ?? 0,
       unpricedEventCount: row.unpricedEvents ?? 0,
@@ -270,6 +263,56 @@ export function getBreakdown(filter: StatsFilter, dimension: BreakdownDimension)
       hasEstimatedTokens: (row.hasEstimated ?? 0) > 0,
     }
   })
+}
+
+interface BreakdownSumRow extends TokenSumRow {
+  key: string
+  pricedCost: number | null
+  unpricedEvents: number | null
+  events: number
+  sessions: number
+  first: number
+  last: number
+  hasEstimated: number | null
+}
+
+function labelOf(dimension: BreakdownDimension, key: string): string {
+  if (dimension === "agent" && isAgentId(key)) return AGENTS[key].label
+  if (dimension === "project") return displayProject(key) ?? key
+  return key
+}
+
+/**
+ * Agents record the same working directory in different shapes, so the SQL
+ * GROUP BY can split one project across rows. Re-group by canonical path.
+ * Session ids never span two shapes of one project, so counts add up.
+ */
+function mergeProjectRows(rows: BreakdownSumRow[]): BreakdownSumRow[] {
+  const merged = new Map<string, BreakdownSumRow>()
+  for (const row of rows) {
+    const key =
+      row.key === "(unknown)" ? row.key : (canonicalProject(row.key) ?? "(unknown)")
+    const prev = merged.get(key)
+    if (!prev) {
+      merged.set(key, { ...row, key })
+      continue
+    }
+    prev.input = (prev.input ?? 0) + (row.input ?? 0)
+    prev.output = (prev.output ?? 0) + (row.output ?? 0)
+    prev.cacheRead = (prev.cacheRead ?? 0) + (row.cacheRead ?? 0)
+    prev.cacheWrite = (prev.cacheWrite ?? 0) + (row.cacheWrite ?? 0)
+    prev.reasoning = (prev.reasoning ?? 0) + (row.reasoning ?? 0)
+    prev.pricedCost = (prev.pricedCost ?? 0) + (row.pricedCost ?? 0)
+    prev.unpricedEvents = (prev.unpricedEvents ?? 0) + (row.unpricedEvents ?? 0)
+    prev.events += row.events
+    prev.sessions += row.sessions
+    prev.first = Math.min(prev.first, row.first)
+    prev.last = Math.max(prev.last, row.last)
+    prev.hasEstimated = Math.max(prev.hasEstimated ?? 0, row.hasEstimated ?? 0)
+  }
+  return [...merged.values()].sort(
+    (a, b) => tokenTotalsOf(b).total - tokenTotalsOf(a).total,
+  )
 }
 
 export function getSessions(filter: StatsFilter, page: number, pageSize: number): SessionPage {
@@ -311,7 +354,7 @@ export function getSessions(filter: StatsFilter, page: number, pageSize: number)
     sessionId: row.sessionId,
     // filter above guarantees this; TS cannot see across the two callbacks
     agent: row.agent as AgentId,
-    project: row.project,
+    project: displayProject(canonicalProject(row.project)),
     models: row.models ? row.models.split(",").filter(Boolean) : [],
     tokens: tokenTotalsOf(row),
     pricedCostUsd: row.pricedCost ?? 0,
