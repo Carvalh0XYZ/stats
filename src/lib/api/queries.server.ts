@@ -51,10 +51,13 @@ interface WhereClause {
   params: (string | number)[]
 }
 
-function whereOf(filter: StatsFilter): WhereClause {
+function whereOf(
+  filter: StatsFilter,
+  interval: Interval = intervalOf(filter)
+): WhereClause {
   const clauses: string[] = []
   const params: (string | number)[] = []
-  const { from, to } = intervalOf(filter)
+  const { from, to } = interval
   if (from !== null) {
     clauses.push("timestamp >= ?")
     params.push(from)
@@ -141,6 +144,7 @@ export function getOverview(filter: StatsFilter): OverviewStats {
     first: number | null
     last: number | null
   }
+  const previous = previousOverview(db, filter)
   const tokens = tokenTotalsOf(row)
   return {
     tokens,
@@ -160,6 +164,43 @@ export function getOverview(filter: StatsFilter): OverviewStats {
     hasEstimatedTokens: (row.hasEstimated ?? 0) > 0,
     firstTimestamp: row.first,
     lastTimestamp: row.last,
+    previous,
+  }
+}
+
+/** Aggregates for the same-length window immediately before the filter range. */
+function previousOverview(
+  db: Database,
+  filter: StatsFilter
+): OverviewStats["previous"] {
+  const { from, to } = intervalOf(filter)
+  if (from === null) return null
+  const length = (to ?? Date.now()) - from
+  const where = whereOf(filter, { from: from - length, to: from })
+  const row = db
+    .prepare(
+      `SELECT ${TOKEN_SUMS},
+        COUNT(*) AS events,
+        COUNT(DISTINCT session_id) AS sessions,
+        SUM(CASE WHEN cost_usd IS NOT NULL THEN cost_usd ELSE 0 END) AS pricedCost
+       FROM usage_events ${where.sql}`
+    )
+    .get(...where.params) as TokenSumRow & {
+    events: number
+    sessions: number
+    pricedCost: number | null
+  }
+  if (row.events === 0) return null
+  const tokens = tokenTotalsOf(row)
+  return {
+    tokens,
+    pricedCostUsd: row.pricedCost ?? 0,
+    sessions: row.sessions,
+    activeTimeMs: activeTime(db, where),
+    cacheReadShare:
+      tokens.input + tokens.cacheRead > 0
+        ? tokens.cacheRead / (tokens.input + tokens.cacheRead)
+        : 0,
   }
 }
 

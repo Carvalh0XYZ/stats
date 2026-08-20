@@ -78,6 +78,7 @@ function OverviewPage() {
   if (overview.events === 0) return <EmptyState filtered={filtered} />
 
   const estimated = overview.hasEstimatedTokens
+  const prev = overview.previous
 
   return (
     <div className="flex flex-col">
@@ -88,12 +89,14 @@ function OverviewPage() {
           icon={RiCoinsLine}
           label="Total tokens"
           value={formatTokens(overview.tokens.total)}
+          delta={deltaOf(overview.tokens.total, prev?.tokens.total)}
           chip={estimated ? "includes est." : undefined}
         />
         <StatTile
           icon={RiMoneyDollarCircleLine}
           label="Priced cost"
           value={formatCost(overview.pricedCostUsd)}
+          delta={deltaOf(overview.pricedCostUsd, prev?.pricedCostUsd)}
           chip={
             overview.unpricedEventCount > 0
               ? `+${formatCount(overview.unpricedEventCount)} unpriced`
@@ -104,22 +107,26 @@ function OverviewPage() {
           icon={RiTerminalBoxLine}
           label="Sessions"
           value={formatCount(overview.sessions)}
+          delta={deltaOf(overview.sessions, prev?.sessions)}
         />
         <StatTile
           icon={RiTimeLine}
           label="Active time"
           value={formatDuration(overview.activeTimeMs)}
+          delta={deltaOf(overview.activeTimeMs, prev?.activeTimeMs)}
           chip={`${formatCount(overview.activeDays)} days`}
         />
         <StatTile
           icon={RiDatabase2Line}
           label="Cache read share"
           value={formatShare(overview.cacheReadShare)}
+          delta={deltaOf(overview.cacheReadShare, prev?.cacheReadShare)}
         />
         <StatTile
           icon={RiExportLine}
           label="Output tokens"
           value={formatTokens(overview.tokens.output)}
+          delta={deltaOf(overview.tokens.output, prev?.tokens.output)}
         />
       </div>
 
@@ -206,16 +213,32 @@ function OverviewPage() {
   )
 }
 
+/** Change vs the previous period as a chip: "+14.8%" lime, "-3.2%" rose, "0.0%" neutral. */
+function deltaOf(
+  current: number,
+  previous: number | undefined
+): { label: string; color: ChipColor } | undefined {
+  if (previous === undefined || previous <= 0) return undefined
+  const pct = ((current - previous) / previous) * 100
+  if (!Number.isFinite(pct)) return undefined
+  const rounded = Math.round(pct * 10) / 10
+  if (rounded === 0) return { label: "0.0%", color: "neutral" }
+  return {
+    label: `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)}%`,
+    color: rounded > 0 ? "lime" : "rose",
+  }
+}
+
 /**
- * BoardUI KPI tile (stat-cards.tsx): icon in a dark rounded chip top-left,
- * label over a big tabular value with an optional tinted delta Chip beside it.
+ * BoardUI KPI tile (stat-cards.tsx): icon in a bordered chip top-left, label
+ * over a big tabular value with a delta Chip and an optional note Chip beside.
  */
 function StatTile({
   icon: Icon,
   label,
   value,
+  delta,
   chip,
-  chipColor = "neutral",
 }: {
   icon: React.ComponentType<{
     className?: string
@@ -223,14 +246,17 @@ function StatTile({
   }>
   label: string
   value: string
+  delta?: { label: string; color: ChipColor }
   chip?: string
-  chipColor?: ChipColor
 }) {
   return (
     <section className="flex h-[132px] min-w-0 flex-col items-start justify-between rounded-2xl bg-muted/50 p-4">
-      <span className="flex items-center rounded-md border bg-background p-1.5 shadow-xs dark:bg-muted">
-        <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-      </span>
+      <div className="flex w-full items-start justify-between gap-2">
+        <span className="flex items-center rounded-md border bg-background p-1.5 shadow-xs dark:bg-muted">
+          <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        </span>
+        {delta ? <Chip color={delta.color}>{delta.label}</Chip> : null}
+      </div>
       <div className="flex w-full flex-col gap-0.5">
         <p className="w-full truncate text-[13px] text-muted-foreground">
           {label}
@@ -239,7 +265,7 @@ function StatTile({
           <p className="text-2xl font-semibold tracking-tight whitespace-nowrap tabular-nums">
             {value}
           </p>
-          {chip ? <Chip color={chipColor}>{chip}</Chip> : null}
+          {chip ? <Chip>{chip}</Chip> : null}
         </div>
       </div>
     </section>

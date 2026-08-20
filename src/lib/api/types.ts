@@ -43,6 +43,14 @@ export interface OverviewStats {
   hasEstimatedTokens: boolean
   firstTimestamp: number | null
   lastTimestamp: number | null
+  /** Same-length window immediately before the range; null for "all" or an empty previous window. */
+  previous: {
+    tokens: TokenTotals
+    pricedCostUsd: number
+    sessions: number
+    activeTimeMs: number
+    cacheReadShare: number
+  } | null
 }
 
 export interface AgentPoint {
