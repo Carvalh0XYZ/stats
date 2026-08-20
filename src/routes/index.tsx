@@ -275,8 +275,8 @@ function StatTile({
 type ChipColor = "lime" | "rose" | "neutral"
 
 const CHIP_COLORS: Record<ChipColor, string> = {
-  lime: "bg-lime-200 text-lime-800 dark:bg-lime-400/15 dark:text-lime-300",
-  rose: "bg-rose-200 text-rose-800 dark:bg-rose-400/15 dark:text-rose-300",
+  lime: "bg-muted text-emerald-700 dark:text-emerald-400",
+  rose: "bg-muted text-red-700 dark:text-red-400",
   neutral: "bg-muted text-muted-foreground",
 }
 
