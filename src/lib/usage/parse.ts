@@ -4,10 +4,7 @@ import { join } from "node:path"
 
 /** Stable event id from identifying parts (agent, path, record identity). */
 export function eventId(...parts: (string | number)[]): string {
-  return createHash("sha256")
-    .update(parts.join("\u0000"))
-    .digest("hex")
-    .slice(0, 32)
+  return createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 32)
 }
 
 const dateFormatters = new Map<string, Intl.DateTimeFormat>()
@@ -38,22 +35,16 @@ export interface JsonlResult {
   /** Byte offset after the last complete line; resume point for the next sync. */
   cursor: number
   malformed: number
-  /** Byte offsets of malformed line ends. */
-  malformedEnds: number[]
 }
 
 /**
  * Read a JSONL file from a byte offset. Malformed lines are counted and
  * skipped; a trailing line without a newline is left for the next sync.
  */
-export async function readJsonl(
-  path: string,
-  resumeOffset = 0
-): Promise<JsonlResult> {
+export async function readJsonl(path: string, resumeOffset = 0): Promise<JsonlResult> {
   const buffer = await fs.readFile(path)
   const lines: JsonlLine[] = []
   let malformed = 0
-  const malformedEnds: number[] = []
   let start = Math.min(resumeOffset, buffer.length)
   let cursor = start
   while (start < buffer.length) {
@@ -66,13 +57,12 @@ export async function readJsonl(
         lines.push({ value: JSON.parse(text), end })
       } catch {
         malformed++
-        malformedEnds.push(end)
       }
     }
     start = end
     cursor = end
   }
-  return { lines, cursor, malformed, malformedEnds }
+  return { lines, cursor, malformed }
 }
 
 /** Parse a whole-file JSON document, or return undefined when malformed. */
@@ -87,7 +77,7 @@ export async function readJsonFile(path: string): Promise<unknown> {
 /** Recursively list files under root whose name passes the filter. */
 export async function walkFiles(
   root: string,
-  filter: (name: string) => boolean
+  filter: (name: string) => boolean,
 ): Promise<string[]> {
   const found: string[] = []
   let entries
@@ -109,12 +99,7 @@ export async function walkFiles(
 
 /** Coerce a token count that may be absent, a string, or fractional. */
 export function tokenCount(value: unknown): number {
-  const n =
-    typeof value === "string"
-      ? Number(value)
-      : typeof value === "number"
-        ? value
-        : 0
+  const n = typeof value === "string" ? Number(value) : typeof value === "number" ? value : 0
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
 }
 

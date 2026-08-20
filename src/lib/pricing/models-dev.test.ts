@@ -19,6 +19,10 @@ const RAW = {
       "free-model": {},
     },
   },
+  "agg-one": { models: { "openai/legacy-codex": { cost: { input: 1.25, output: 10, cache_read: 0.125 } } } },
+  "agg-two": { models: { "openai/legacy-codex": { cost: { input: 1.25, output: 10, cache_read: 0.125 } } } },
+  "agg-three": { models: { "legacy-codex": { cost: { input: 9, output: 9 } } } },
+  "agg-four": { models: { "legacy-codex": { cost: { input: 7, output: 7 } } } },
 }
 
 function writeCache(fetchedAt: number): void {
@@ -68,6 +72,15 @@ describe("models.dev pricing", () => {
     expect(findRates(catalog, null, "claude-sonnet-4-5")?.input).toBe(3)
     // Unknown model resolves to nothing.
     expect(findRates(catalog, "anthropic", "never-heard-of-it")).toBeNull()
+  })
+
+  it("falls back to the cross-provider consensus for delisted models", async () => {
+    writeCache(Date.now())
+    const catalog = (await loadCatalog(cacheDir))!
+    // "legacy-codex" has no exact or unambiguous entry, but the plurality of
+    // rows sharing the trailing segment agree on one rate tuple.
+    expect(findRates(catalog, "openai", "legacy-codex")).toMatchObject({ input: 1.25, output: 10, cacheRead: 0.125 })
+    // A 1:1 rate split (see "shared-model") stays unpriced — covered above.
   })
 
   it("prices per million tokens across all buckets", async () => {

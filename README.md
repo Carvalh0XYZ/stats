@@ -40,8 +40,10 @@ Google Antigravity, Trae, Warp/Oz, and MiniMax Code.
   Linux, `%LOCALAPPDATA%\telemetry-stats` on Windows).
 - Costs recorded by an agent are kept as reported. Other events are priced
   from a locally cached [models.dev](https://models.dev) catalog and marked
-  "estimated"; unresolved models stay "unpriced" and are never folded into a
-  total silently.
+  "estimated": exact provider+model first, then an unambiguous model id, then
+  the rate tuple a strict plurality of providers agree on for that model id
+  (aggregators republish delisted first-party models). Unresolved models stay
+  "unpriced" and are never folded into a total silently.
 
 ## Development
 

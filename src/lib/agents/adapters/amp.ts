@@ -111,6 +111,7 @@ function ampProject(thread: Record<string, unknown>): string | null {
   return (
     textOf(thread.project) ??
     localRepository ??
+    workspacePath ??
     workspaceRoot ??
     textOf(skillSnapshot?.cliProxyAPIWorkspaceRoot) ??
     textOf(skillSnapshot?.cliProxyAPIWorkingDirectory) ??
