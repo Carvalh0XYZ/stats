@@ -38,41 +38,79 @@ interface ForkState {
   isUserFork: boolean
 }
 
+interface StoredForkState extends Omit<ForkState, "taskStartedTurnIds"> {
+  taskStartedTurnIds: string[]
+}
+
+interface CodexResumeState {
+  v: 1
+  model: string | null
+  provider: string
+  project: string | null
+  metaSessionId: string | null
+  previous: Totals | null
+  fork: StoredForkState
+}
+
 export const codexAdapter: AgentAdapter = {
   id: "codex",
   label: "Codex CLI",
-  version: 3,
+  version: 4,
   async *discover(context) {
     const home = context.env.CODEX_HOME?.trim() || join(context.home, ".codex")
-    for (const root of [join(home, "sessions"), join(home, "archived_sessions")]) {
-      for (const path of await walkFiles(root, (name) => name.endsWith(".jsonl"))) {
+    for (const root of [
+      join(home, "sessions"),
+      join(home, "archived_sessions"),
+    ]) {
+      for (const path of await walkFiles(root, (name) =>
+        name.endsWith(".jsonl")
+      )) {
         yield { agent: "codex", path, kind: "jsonl" }
       }
     }
   },
-  // Always parses the whole file (no resume cursor): fork-replay skipping and
-  // cumulative-total deltas need state from the top of the log.
   async parse(source, context) {
-    const result = await readJsonl(source.path)
-    if (result.malformed > 0) context.warn(`${result.malformed} malformed JSONL record(s)`)
-    const sessionId = source.path.split(/[\\/]/u).at(-1)?.replace(/\.jsonl$/u, "") ?? fileSession(source.path)
+    const resume =
+      context.resumeOffset === undefined
+        ? null
+        : readResumeState(context.resumeState)
+    const replaceExisting = context.resumeOffset !== undefined && !resume
+    if (replaceExisting) {
+      context.warn("invalid resume state; parsing full file")
+    }
+    const result = await readJsonl(
+      source.path,
+      resume ? context.resumeOffset : 0
+    )
+    if (result.malformed > 0)
+      context.warn(`${result.malformed} malformed JSONL record(s)`)
+    const sessionId =
+      source.path
+        .split(/[\\/]/u)
+        .at(-1)
+        ?.replace(/\.jsonl$/u, "") ?? fileSession(source.path)
     const events: UsageEvent[] = []
     const pending: PendingEvent[] = []
-    let model: string | null = null
-    let provider = "openai"
-    let project: string | null = null
-    let metaSessionId: string | null = null
-    let previous: Totals | null = null
-    const fork: ForkState = {
-      forkedFromId: null,
-      childSessionId: null,
-      waiting: false,
-      replaySessionId: null,
-      inheritedBaseline: null,
-      inheritedReportedTotal: null,
-      taskStartedTurnIds: new Set(),
-      isUserFork: false,
-    }
+    let model = resume?.model ?? null
+    let provider = resume?.provider ?? "openai"
+    let project = resume?.project ?? null
+    let metaSessionId = resume?.metaSessionId ?? null
+    let previous = resume?.previous ?? null
+    const fork: ForkState = resume
+      ? {
+          ...resume.fork,
+          taskStartedTurnIds: new Set(resume.fork.taskStartedTurnIds),
+        }
+      : {
+          forkedFromId: null,
+          childSessionId: null,
+          waiting: false,
+          replaySessionId: null,
+          inheritedBaseline: null,
+          inheritedReportedTotal: null,
+          taskStartedTurnIds: new Set(),
+          isUserFork: false,
+        }
 
     const emit = (entry: PendingEvent, eventModel: string | null): void => {
       const scope = fork.forkedFromId ?? metaSessionId ?? sessionId
@@ -107,18 +145,28 @@ export const codexAdapter: AgentAdapter = {
       const payload = recordOf(entry?.payload)
       if (!entry || !payload) continue
       const info = recordOf(payload.info)
-      const isTokenCount = entry.type === "event_msg" && payload.type === "token_count"
-      const infoModel = isTokenCount && info ? textOf(info.model) ?? textOf(info.model_name) : null
+      const isTokenCount =
+        entry.type === "event_msg" && payload.type === "token_count"
+      const infoModel =
+        isTokenCount && info
+          ? (textOf(info.model) ?? textOf(info.model_name))
+          : null
       const modelInfo = recordOf(payload.model_info)
       const payloadModel =
-        textOf(modelInfo?.slug) ?? textOf(payload.model) ?? textOf(payload.model_name) ?? infoModel
+        textOf(modelInfo?.slug) ??
+        textOf(payload.model) ??
+        textOf(payload.model_name) ??
+        infoModel
       const eventModel = payloadModel ?? infoModel
 
       // Forked child logs replay the parent transcript (including its
       // token_count history) before the child's own turns. Skip everything
       // until a turn_context that belongs to the child itself.
       if (fork.waiting) {
-        if (entry.type === "turn_context" && forkTurnStartsOwnSession(fork, textOf(payload.turn_id))) {
+        if (
+          entry.type === "turn_context" &&
+          forkTurnStartsOwnSession(fork, textOf(payload.turn_id))
+        ) {
           fork.waiting = false
           fork.replaySessionId = null
           fork.taskStartedTurnIds.clear()
@@ -130,13 +178,17 @@ export const codexAdapter: AgentAdapter = {
         }
         if (entry.type === "event_msg" && payload.type === "task_started") {
           const turnId = textOf(payload.turn_id)
-          if (turnId && forkTaskStartsOwnSession(fork, turnId, payload.started_at)) {
+          if (
+            turnId &&
+            forkTaskStartsOwnSession(fork, turnId, payload.started_at)
+          ) {
             fork.taskStartedTurnIds.add(turnId)
           }
         }
         if (entry.type === "session_meta") {
           const id = textOf(payload.id)
-          if (id && fork.childSessionId && fork.childSessionId !== id) fork.replaySessionId = id
+          if (id && fork.childSessionId && fork.childSessionId !== id)
+            fork.replaySessionId = id
         }
         if (isTokenCount && info) {
           const usage = recordOf(info.total_token_usage)
@@ -150,7 +202,12 @@ export const codexAdapter: AgentAdapter = {
         continue
       }
 
-      if (pending.length > 0 && !eventModel && !isTokenCount && entry.type !== "session_meta") {
+      if (
+        pending.length > 0 &&
+        !eventModel &&
+        !isTokenCount &&
+        entry.type !== "session_meta"
+      ) {
         flushPending(null)
       }
 
@@ -160,7 +217,10 @@ export const codexAdapter: AgentAdapter = {
         const source_ = recordOf(payload.source)
         const forkedFromId =
           textOf(payload.forked_from_id) ??
-          textOf(recordOf(recordOf(source_?.subagent)?.thread_spawn)?.parent_thread_id)
+          textOf(
+            recordOf(recordOf(source_?.subagent)?.thread_spawn)
+              ?.parent_thread_id
+          )
         if (forkedFromId) {
           // The waiting branch above consumes every record, so a repeated
           // child meta can only be seen after the skip already ended.
@@ -210,7 +270,11 @@ export const codexAdapter: AgentAdapter = {
         if (sameTotals(total, previous)) continue
         // Out-of-order snapshots regress slightly and then resume from the
         // true watermark; counting `last` again would double bill the turn.
-        if (!subtract(total, previous) && staleRegression(total, previous, last)) continue
+        if (
+          !subtract(total, previous) &&
+          staleRegression(total, previous, last)
+        )
+          continue
         tokens = toTokens(last)
         nextTotals = total
       } else if (total && last) {
@@ -233,23 +297,154 @@ export const codexAdapter: AgentAdapter = {
       } else if (last) {
         tokens = toTokens(last)
         nextTotals = previous
-          ? { input: previous.input + last.input, output: previous.output + last.output, cacheRead: previous.cacheRead + last.cacheRead, reasoning: previous.reasoning + last.reasoning }
+          ? {
+              input: previous.input + last.input,
+              output: previous.output + last.output,
+              cacheRead: previous.cacheRead + last.cacheRead,
+              reasoning: previous.reasoning + last.reasoning,
+            }
           : null
       } else {
         continue
       }
       // Skip zero-token snapshots without advancing the baseline so that
       // post-compaction zero totals do not inflate later deltas.
-      if (tokens.input === 0 && tokens.output === 0 && tokens.cacheRead === 0 && tokens.reasoning === 0) continue
+      if (
+        tokens.input === 0 &&
+        tokens.output === 0 &&
+        tokens.cacheRead === 0 &&
+        tokens.reasoning === 0
+      )
+        continue
       previous = nextTotals
 
-      const record: PendingEvent = { provider, project, timestamp: entry.timestamp, tokens, total }
+      const record: PendingEvent = {
+        provider,
+        project,
+        timestamp: entry.timestamp,
+        tokens,
+        total,
+      }
       if (resolved) emit(record, resolved)
       else pending.push(record)
     }
+    const resumable = pending.length === 0
     flushPending(null)
-    return { events }
+    if (!resumable) return { events, replaceExisting }
+    const state: CodexResumeState = {
+      v: 1,
+      model,
+      provider,
+      project,
+      metaSessionId,
+      previous,
+      fork: { ...fork, taskStartedTurnIds: [...fork.taskStartedTurnIds] },
+    }
+    return {
+      events,
+      replaceExisting,
+      cursor: result.cursor,
+      state: JSON.stringify(state),
+    }
   },
+}
+
+function readResumeState(encoded: string | undefined): CodexResumeState | null {
+  if (!encoded) return null
+  try {
+    const state = recordOf(JSON.parse(encoded))
+    const fork = recordOf(state?.fork)
+    if (!state || state.v !== 1 || !fork) return null
+
+    const model = storedString(state.model)
+    const provider = storedString(state.provider)
+    const project = storedString(state.project)
+    const metaSessionId = storedString(state.metaSessionId)
+    const previous = storedTotals(state.previous)
+    const forkedFromId = storedString(fork.forkedFromId)
+    const childSessionId = storedString(fork.childSessionId)
+    const replaySessionId = storedString(fork.replaySessionId)
+    const inheritedBaseline = storedTotals(fork.inheritedBaseline)
+    const inheritedReportedTotal = storedNumber(fork.inheritedReportedTotal)
+    const taskStartedTurnIds = fork.taskStartedTurnIds
+    if (
+      model === undefined ||
+      provider === undefined ||
+      provider === null ||
+      project === undefined ||
+      metaSessionId === undefined ||
+      previous === undefined ||
+      forkedFromId === undefined ||
+      childSessionId === undefined ||
+      replaySessionId === undefined ||
+      inheritedBaseline === undefined ||
+      inheritedReportedTotal === undefined ||
+      typeof fork.waiting !== "boolean" ||
+      typeof fork.isUserFork !== "boolean" ||
+      !Array.isArray(taskStartedTurnIds) ||
+      !taskStartedTurnIds.every(
+        (value) => typeof value === "string" && value.length > 0
+      )
+    ) {
+      return null
+    }
+
+    return {
+      v: 1,
+      model,
+      provider,
+      project,
+      metaSessionId,
+      previous,
+      fork: {
+        forkedFromId,
+        childSessionId,
+        waiting: fork.waiting,
+        replaySessionId,
+        inheritedBaseline,
+        inheritedReportedTotal,
+        taskStartedTurnIds,
+        isUserFork: fork.isUserFork,
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
+function storedString(value: unknown): string | null | undefined {
+  if (value === null) return null
+  return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function storedNumber(value: unknown): number | null | undefined {
+  if (value === null) return null
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : undefined
+}
+
+function storedTotals(value: unknown): Totals | null | undefined {
+  if (value === null) return null
+  const totals = recordOf(value)
+  if (!totals) return undefined
+  const input = storedNumber(totals.input)
+  const output = storedNumber(totals.output)
+  const cacheRead = storedNumber(totals.cacheRead)
+  const reasoning = storedNumber(totals.reasoning)
+  if (
+    input === undefined ||
+    input === null ||
+    output === undefined ||
+    output === null ||
+    cacheRead === undefined ||
+    cacheRead === null ||
+    reasoning === undefined ||
+    reasoning === null
+  ) {
+    return undefined
+  }
+  return { input, output, cacheRead, reasoning }
 }
 
 function readTotals(value: Record<string, unknown> | null): Totals | null {
@@ -257,7 +452,10 @@ function readTotals(value: Record<string, unknown> | null): Totals | null {
   return {
     input: tokenCount(value.input_tokens),
     output: tokenCount(value.output_tokens),
-    cacheRead: Math.max(tokenCount(value.cached_input_tokens), tokenCount(value.cache_read_input_tokens)),
+    cacheRead: Math.max(
+      tokenCount(value.cached_input_tokens),
+      tokenCount(value.cache_read_input_tokens)
+    ),
     reasoning: tokenCount(value.reasoning_output_tokens),
   }
 }
@@ -280,11 +478,22 @@ function toTokens(totals: Totals): TokenBreakdown {
 }
 
 function sameTotals(a: Totals, b: Totals): boolean {
-  return a.input === b.input && a.output === b.output && a.cacheRead === b.cacheRead && a.reasoning === b.reasoning
+  return (
+    a.input === b.input &&
+    a.output === b.output &&
+    a.cacheRead === b.cacheRead &&
+    a.reasoning === b.reasoning
+  )
 }
 
 function subtract(now: Totals, old: Totals): Totals | null {
-  if (now.input < old.input || now.output < old.output || now.cacheRead < old.cacheRead || now.reasoning < old.reasoning) return null
+  if (
+    now.input < old.input ||
+    now.output < old.output ||
+    now.cacheRead < old.cacheRead ||
+    now.reasoning < old.reasoning
+  )
+    return null
   return {
     input: now.input - old.input,
     output: now.output - old.output,
@@ -302,12 +511,19 @@ function sumOf(totals: Totals): number {
  * total regresses by roughly one recent increment, then resumes from the true
  * higher watermark. Treat those as stale snapshots rather than hard resets.
  */
-function staleRegression(current: Totals, previous: Totals, last: Totals): boolean {
+function staleRegression(
+  current: Totals,
+  previous: Totals,
+  last: Totals
+): boolean {
   const previousTotal = sumOf(previous)
   const currentTotal = sumOf(current)
   const lastTotal = sumOf(last)
   if (previousTotal <= 0 || currentTotal <= 0 || lastTotal <= 0) return false
-  return currentTotal * 100 >= previousTotal * 98 || currentTotal + lastTotal * 2 >= previousTotal
+  return (
+    currentTotal * 100 >= previousTotal * 98 ||
+    currentTotal + lastTotal * 2 >= previousTotal
+  )
 }
 
 function reportedTotal(usage: Record<string, unknown>): number | null {
@@ -318,11 +534,12 @@ function reportedTotal(usage: Record<string, unknown>): number | null {
 function skipInheritedSnapshot(
   fork: ForkState,
   totalUsage: Record<string, unknown> | null,
-  total: Totals | null,
+  total: Totals | null
 ): boolean {
   if (totalUsage && fork.inheritedReportedTotal !== null) {
     const reported = reportedTotal(totalUsage)
-    if (reported !== null && reported <= fork.inheritedReportedTotal) return true
+    if (reported !== null && reported <= fork.inheritedReportedTotal)
+      return true
   }
   if (total && fork.inheritedBaseline) {
     return (
@@ -341,7 +558,11 @@ function skipInheritedSnapshot(
  */
 function uuid7Key(id: string): string | null {
   const parts = id.split("-")
-  if (parts.length !== 5 || parts.some((part, index) => part.length !== [8, 4, 4, 4, 12][index])) return null
+  if (
+    parts.length !== 5 ||
+    parts.some((part, index) => part.length !== [8, 4, 4, 4, 12][index])
+  )
+    return null
   if (!parts[2].startsWith("7")) return null
   const key = parts.join("").toLowerCase()
   return /^[0-9a-f]{32}$/u.test(key) ? key : null
@@ -354,7 +575,10 @@ function uuid7Key(id: string): string | null {
  * ties resolve through task_started announcements (subagent forks) or the
  * fork millisecond itself (user forks).
  */
-function forkTurnStartsOwnSession(fork: ForkState, turnId: string | null): boolean {
+function forkTurnStartsOwnSession(
+  fork: ForkState,
+  turnId: string | null
+): boolean {
   if (fork.replaySessionId === null) return true
   if (!fork.childSessionId) return true
   const childKey = uuid7Key(fork.childSessionId)
@@ -366,12 +590,18 @@ function forkTurnStartsOwnSession(fork: ForkState, turnId: string | null): boole
   return fork.isUserFork || fork.taskStartedTurnIds.has(turnId)
 }
 
-function forkTaskStartsOwnSession(fork: ForkState, turnId: string, startedAt: unknown): boolean {
+function forkTaskStartsOwnSession(
+  fork: ForkState,
+  turnId: string,
+  startedAt: unknown
+): boolean {
   if (!fork.childSessionId) return false
   const childKey = uuid7Key(fork.childSessionId)
   if (!childKey) return true
   const turnKey = uuid7Key(turnId)
   if (turnKey) return turnKey.slice(0, 12) >= childKey.slice(0, 12)
   if (typeof startedAt !== "number") return false
-  return startedAt >= Math.floor(Number.parseInt(childKey.slice(0, 12), 16) / 1000)
+  return (
+    startedAt >= Math.floor(Number.parseInt(childKey.slice(0, 12), 16) / 1000)
+  )
 }

@@ -1,15 +1,31 @@
 import { createHash } from "node:crypto"
 import { promises as fs } from "node:fs"
+import type { Stats } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { setTimeout } from "node:timers/promises"
 import type { Database } from "better-sqlite3"
 import { ADAPTERS } from "../agents"
-import type { AgentAdapter, DiscoveryContext, UsageSource } from "../agents/types"
+import type {
+  AgentAdapter,
+  DiscoveryContext,
+  ParseOutput,
+  UsageSource,
+} from "../agents/types"
 import type { AgentId } from "../agents/registry"
-import { extraRoots, getDb, insertEvents, pinnedTimezone } from "../db/client.server"
+import {
+  extraRoots,
+  getDb,
+  insertEvents,
+  pinnedTimezone,
+} from "../db/client.server"
 import { dataDir } from "../db/paths.server"
-import { loadCatalog, findRates, priceTokens, type PricingCatalog } from "../pricing/models-dev"
+import {
+  loadCatalog,
+  findRates,
+  priceTokens,
+  type PricingCatalog,
+} from "../pricing/models-dev"
 import type { UsageEvent } from "../usage/types"
 
 export interface SyncProgress {
@@ -39,6 +55,8 @@ interface SourceRow {
   mtime_ms: number
   sample_hash: string
   cursor: number | null
+  resume_state: string | null
+  error: string | null
 }
 
 let activeSync: Promise<SyncResult> | null = null
@@ -71,7 +89,7 @@ async function runSync(options: SyncOptions): Promise<SyncResult> {
       extraRoots: extraRoots(),
     }
     const adapters = ADAPTERS.filter(
-      adapter => !options.agents || options.agents.includes(adapter.id),
+      (adapter) => !options.agents || options.agents.includes(adapter.id)
     )
 
     const discovered: { adapter: AgentAdapter; source: UsageSource }[] = []
@@ -95,70 +113,141 @@ async function runSync(options: SyncOptions): Promise<SyncResult> {
       durationMs: 0,
     }
     const selectSource = db.prepare(
-      "SELECT path, adapter_version, size, mtime_ms, sample_hash, cursor FROM sources WHERE path = ?",
+      "SELECT path, adapter_version, size, mtime_ms, sample_hash, cursor, resume_state, error FROM sources WHERE path = ?"
     )
 
     for (const [index, { adapter, source }] of discovered.entries()) {
-      options.onProgress?.({ current: index + 1, total: discovered.length, path: source.path })
-      let stat
+      options.onProgress?.({
+        current: index + 1,
+        total: discovered.length,
+        path: source.path,
+      })
+      let stat: Stats
       try {
         stat = await fs.stat(source.path)
       } catch {
         continue
       }
       const known = selectSource.get(source.path) as SourceRow | undefined
-      const sampleHash = await sampleFileHash(source.path, stat.size)
+      let sampleHash = await sampleFileHash(source.path, stat.size)
       const unchanged =
         known &&
         known.adapter_version === adapter.version &&
         known.size === stat.size &&
         known.mtime_ms === Math.trunc(stat.mtimeMs) &&
-        known.sample_hash === sampleHash
+        known.sample_hash === sampleHash &&
+        known.error === null
       if (unchanged) {
         result.skipped++
         continue
       }
 
-      // Resume only when the file strictly grew under the same adapter
-      // version; a rewrite or shrink forces a full re-parse.
-      const resumeOffset =
+      let resumeOffset: number | undefined
+      if (
         known &&
         known.adapter_version === adapter.version &&
+        Number.isSafeInteger(known.size) &&
+        known.size >= 0 &&
         known.cursor !== null &&
-        stat.size > known.size
-          ? known.cursor
-          : undefined
+        Number.isSafeInteger(known.cursor) &&
+        known.cursor >= 0 &&
+        known.cursor <= known.size &&
+        stat.size > known.size &&
+        (await sampleFileHash(source.path, known.size)) === known.sample_hash
+      ) {
+        resumeOffset = known.cursor
+      }
 
-      let warnings = 0
+      let retryWarnings = 0
       try {
-        const output = await adapter.parse(source, {
-          timezone,
-          resumeOffset,
-          warn: () => warnings++,
-        })
+        let output: ParseOutput
+        let sourceWarnings = 0
+        for (let attempt = 0; ; attempt++) {
+          let attemptWarnings = 0
+          output = await adapter.parse(source, {
+            timezone,
+            resumeOffset,
+            resumeState:
+              resumeOffset === undefined
+                ? undefined
+                : (known?.resume_state ?? undefined),
+            warn: () => attemptWarnings++,
+          })
+          const parsedStat = await fs.stat(source.path)
+          const parsedSampleHash = await sampleFileHash(
+            source.path,
+            parsedStat.size
+          )
+          const stable =
+            parsedStat.dev === stat.dev &&
+            parsedStat.ino === stat.ino &&
+            parsedStat.size === stat.size &&
+            Math.trunc(parsedStat.mtimeMs) === Math.trunc(stat.mtimeMs) &&
+            Math.trunc(parsedStat.ctimeMs) === Math.trunc(stat.ctimeMs) &&
+            parsedSampleHash === sampleHash
+          stat = parsedStat
+          sampleHash = parsedSampleHash
+          if (stable) {
+            sourceWarnings = attemptWarnings
+            break
+          }
+          retryWarnings++
+          if (attempt > 0) throw new Error("source changed while parsing")
+          resumeOffset = undefined
+        }
         priceEvents(output.events, catalog)
         db.transaction(() => {
-          if (resumeOffset === undefined) {
-            db.prepare("DELETE FROM usage_events WHERE source_path = ?").run(source.path)
+          if (resumeOffset === undefined || output.replaceExisting) {
+            db.prepare("DELETE FROM usage_events WHERE source_path = ?").run(
+              source.path
+            )
           }
           result.inserted += insertEvents(db, dedupe(db, output.events))
-          upsertSource(db, adapter, source, stat, sampleHash, output.cursor ?? null, warnings, null)
+          upsertSource(
+            db,
+            adapter,
+            source,
+            stat,
+            sampleHash,
+            output.cursor ?? null,
+            output.cursor === undefined ? null : (output.state ?? null),
+            sourceWarnings,
+            null
+          )
         })()
         result.processed++
-        result.warnings += warnings
+        result.warnings += retryWarnings + sourceWarnings
       } catch (error) {
         db.transaction(() => {
-          upsertSource(db, adapter, source, stat, sampleHash, null, warnings, describeError(error))
+          upsertSource(
+            db,
+            adapter,
+            source,
+            stat,
+            sampleHash,
+            null,
+            null,
+            0,
+            describeError(error)
+          )
         })()
-        result.warnings++
+        result.warnings += retryWarnings + 1
       }
     }
 
     result.durationMs = Date.now() - started
     db.prepare(
       `INSERT INTO sync_runs (started_at, finished_at, discovered, processed, skipped, inserted, warnings)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(started, Date.now(), result.discovered, result.processed, result.skipped, result.inserted, result.warnings)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      started,
+      Date.now(),
+      result.discovered,
+      result.processed,
+      result.skipped,
+      result.inserted,
+      result.warnings
+    )
     return result
   } finally {
     await fs.rm(lockPath, { force: true })
@@ -171,10 +260,10 @@ async function runSync(options: SyncOptions): Promise<SyncResult> {
  */
 function dedupe(db: Database, events: UsageEvent[]): UsageEvent[] {
   const existing = db.prepare(
-    "SELECT 1 FROM usage_events WHERE agent = ? AND dedup_key = ? LIMIT 1",
+    "SELECT 1 FROM usage_events WHERE agent = ? AND dedup_key = ? LIMIT 1"
   )
   const seen = new Set<string>()
-  return events.filter(event => {
+  return events.filter((event) => {
     if (!event.dedupKey) return true
     const key = `${event.agent}\u0000${event.dedupKey}`
     if (seen.has(key)) return false
@@ -184,10 +273,15 @@ function dedupe(db: Database, events: UsageEvent[]): UsageEvent[] {
 }
 
 /** Price events that have no reported cost. Reported costs are never touched. */
-function priceEvents(events: UsageEvent[], catalog: PricingCatalog | null): void {
+function priceEvents(
+  events: UsageEvent[],
+  catalog: PricingCatalog | null
+): void {
   for (const event of events) {
     if (event.costUsd !== null) continue
-    const rates = catalog ? findRates(catalog, event.provider, event.model) : null
+    const rates = catalog
+      ? findRates(catalog, event.provider, event.model)
+      : null
     if (rates) {
       event.costUsd = priceTokens(rates, event.tokens)
       event.costSource = "estimated"
@@ -204,12 +298,13 @@ function upsertSource(
   stat: { size: number; mtimeMs: number },
   sampleHash: string,
   cursor: number | null,
+  resumeState: string | null,
   warnings: number,
-  error: string | null,
+  error: string | null
 ): void {
   db.prepare(
-    `INSERT INTO sources (path, agent, adapter_version, kind, size, mtime_ms, sample_hash, cursor, warnings, error, last_synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO sources (path, agent, adapter_version, kind, size, mtime_ms, sample_hash, cursor, resume_state, warnings, error, last_synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(path) DO UPDATE SET
        agent = excluded.agent,
        adapter_version = excluded.adapter_version,
@@ -218,9 +313,10 @@ function upsertSource(
        mtime_ms = excluded.mtime_ms,
        sample_hash = excluded.sample_hash,
        cursor = excluded.cursor,
+       resume_state = excluded.resume_state,
        warnings = excluded.warnings,
        error = excluded.error,
-       last_synced_at = excluded.last_synced_at`,
+       last_synced_at = excluded.last_synced_at`
   ).run(
     source.path,
     adapter.id,
@@ -230,18 +326,29 @@ function upsertSource(
     Math.trunc(stat.mtimeMs),
     sampleHash,
     cursor,
+    resumeState,
     warnings,
     error,
-    Date.now(),
+    Date.now()
   )
 }
 
-function recordAgentError(db: Database, adapter: AgentAdapter, error: unknown): void {
+function recordAgentError(
+  db: Database,
+  adapter: AgentAdapter,
+  error: unknown
+): void {
   db.prepare(
     `INSERT INTO sources (path, agent, adapter_version, kind, size, mtime_ms, sample_hash, cursor, warnings, error, last_synced_at)
      VALUES (?, ?, ?, 'discovery', 0, 0, '', NULL, 0, ?, ?)
-     ON CONFLICT(path) DO UPDATE SET error = excluded.error, last_synced_at = excluded.last_synced_at`,
-  ).run(`discovery://${adapter.id}`, adapter.id, adapter.version, describeError(error), Date.now())
+     ON CONFLICT(path) DO UPDATE SET error = excluded.error, last_synced_at = excluded.last_synced_at`
+  ).run(
+    `discovery://${adapter.id}`,
+    adapter.id,
+    adapter.version,
+    describeError(error),
+    Date.now()
+  )
 }
 
 /** Error text safe to persist: message only, never file content. */
@@ -258,7 +365,8 @@ async function sampleFileHash(path: string, size: number): Promise<string> {
     const sample = Buffer.alloc(4096)
     for (let i = 0; i < 5; i++) {
       const offset = Math.trunc((size / 5) * i)
-      const { bytesRead } = await handle.read(sample, 0, sample.length, offset)
+      const length = Math.min(sample.length, Math.max(size - offset, 0))
+      const { bytesRead } = await handle.read(sample, 0, length, offset)
       hash.update(sample.subarray(0, bytesRead))
     }
   } finally {
