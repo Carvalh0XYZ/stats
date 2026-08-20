@@ -1,4 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router"
+import {
+  RiCoinsLine,
+  RiDatabase2Line,
+  RiExportLine,
+  RiMoneyDollarCircleLine,
+  RiTerminalBoxLine,
+  RiTimeLine,
+} from "@remixicon/react"
 
 import { AGENTS } from "@/lib/agents/registry"
 import type {
@@ -75,41 +83,41 @@ function OverviewPage() {
     <div className="flex flex-col">
       <h1 className="sr-only">Overview</h1>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6">
-        <Kpi
-          className="pb-4 xl:pb-0"
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatTile
+          icon={RiCoinsLine}
           label="Total tokens"
           value={formatTokens(overview.tokens.total)}
-          note={estimated ? "includes estimated" : undefined}
+          chip={estimated ? "includes est." : undefined}
         />
-        <Kpi
-          className="border-l pb-4 pl-4 xl:pb-0"
+        <StatTile
+          icon={RiMoneyDollarCircleLine}
           label="Priced cost"
           value={formatCost(overview.pricedCostUsd)}
-          note={
+          chip={
             overview.unpricedEventCount > 0
               ? `+${formatCount(overview.unpricedEventCount)} unpriced`
               : undefined
           }
         />
-        <Kpi
-          className="border-t pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pb-4 sm:pl-4 xl:pb-0"
+        <StatTile
+          icon={RiTerminalBoxLine}
           label="Sessions"
           value={formatCount(overview.sessions)}
         />
-        <Kpi
-          className="border-t border-l pt-4 pl-4 sm:border-l-0 sm:pl-0 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-4"
+        <StatTile
+          icon={RiTimeLine}
           label="Active time"
           value={formatDuration(overview.activeTimeMs)}
-          note={`${formatCount(overview.activeDays)} active days`}
+          chip={`${formatCount(overview.activeDays)} days`}
         />
-        <Kpi
-          className="border-t pt-4 sm:border-l sm:pl-4 xl:border-t-0 xl:pt-0"
+        <StatTile
+          icon={RiDatabase2Line}
           label="Cache read share"
           value={formatShare(overview.cacheReadShare)}
         />
-        <Kpi
-          className="border-t border-l pt-4 pl-4 xl:border-t-0 xl:pt-0"
+        <StatTile
+          icon={RiExportLine}
           label="Output tokens"
           value={formatTokens(overview.tokens.output)}
         />
@@ -198,25 +206,68 @@ function OverviewPage() {
   )
 }
 
-function Kpi({
+/**
+ * BoardUI KPI tile (stat-cards.tsx): icon in a dark rounded chip top-left,
+ * label over a big tabular value with an optional tinted delta Chip beside it.
+ */
+function StatTile({
+  icon: Icon,
   label,
   value,
-  note,
-  className,
+  chip,
+  chipColor = "neutral",
 }: {
+  icon: React.ComponentType<{
+    className?: string
+    "aria-hidden"?: boolean | "true" | "false"
+  }>
   label: string
   value: string
-  note?: string
-  className?: string
+  chip?: string
+  chipColor?: ChipColor
 }) {
   return (
-    <div className={`flex flex-col gap-1 pr-4 ${className ?? ""}`}>
-      <p className="truncate text-[13px] text-muted-foreground">{label}</p>
-      <p className="text-2xl font-semibold tracking-tight tabular-nums">
-        {value}
-      </p>
-      {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
-    </div>
+    <section className="flex h-[132px] min-w-0 flex-col items-start justify-between rounded-2xl bg-muted/50 p-4">
+      <span className="flex items-center rounded-md border bg-background p-1.5 shadow-xs dark:bg-muted">
+        <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+      </span>
+      <div className="flex w-full flex-col gap-0.5">
+        <p className="w-full truncate text-[13px] text-muted-foreground">
+          {label}
+        </p>
+        <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+          <p className="text-2xl font-semibold tracking-tight whitespace-nowrap tabular-nums">
+            {value}
+          </p>
+          {chip ? <Chip color={chipColor}>{chip}</Chip> : null}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+type ChipColor = "lime" | "rose" | "neutral"
+
+const CHIP_COLORS: Record<ChipColor, string> = {
+  lime: "bg-lime-200 text-lime-800 dark:bg-lime-400/15 dark:text-lime-300",
+  rose: "bg-rose-200 text-rose-800 dark:bg-rose-400/15 dark:text-rose-300",
+  neutral: "bg-muted text-muted-foreground",
+}
+
+/** BoardUI Chip (chip.tsx): tinted label pill next to a headline value. */
+function Chip({
+  color = "neutral",
+  children,
+}: {
+  color?: ChipColor
+  children: React.ReactNode
+}) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium whitespace-nowrap ${CHIP_COLORS[color]}`}
+    >
+      {children}
+    </span>
   )
 }
 
