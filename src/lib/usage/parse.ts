@@ -4,7 +4,10 @@ import { join } from "node:path"
 
 /** Stable event id from identifying parts (agent, path, record identity). */
 export function eventId(...parts: (string | number)[]): string {
-  return createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 32)
+  return createHash("sha256")
+    .update(parts.join("\u0000"))
+    .digest("hex")
+    .slice(0, 32)
 }
 
 const dateFormatters = new Map<string, Intl.DateTimeFormat>()
@@ -41,12 +44,41 @@ export interface JsonlResult {
  * Read a JSONL file from a byte offset. Malformed lines are counted and
  * skipped; a trailing line without a newline is left for the next sync.
  */
-export async function readJsonl(path: string, resumeOffset = 0): Promise<JsonlResult> {
-  const buffer = await fs.readFile(path)
+export async function readJsonl(
+  path: string,
+  resumeOffset = 0
+): Promise<JsonlResult> {
+  let baseOffset = 0
+  let buffer: Buffer
+  if (resumeOffset > 0) {
+    const handle = await fs.open(path, "r")
+    try {
+      const { size } = await handle.stat()
+      baseOffset = Math.min(resumeOffset, size)
+      const length = size - baseOffset
+      buffer = Buffer.allocUnsafe(length)
+      let read = 0
+      while (read < length) {
+        const { bytesRead } = await handle.read(
+          buffer,
+          read,
+          length - read,
+          baseOffset + read
+        )
+        if (bytesRead === 0) break
+        read += bytesRead
+      }
+      buffer = buffer.subarray(0, read)
+    } finally {
+      await handle.close()
+    }
+  } else {
+    buffer = await fs.readFile(path)
+  }
   const lines: JsonlLine[] = []
   let malformed = 0
-  let start = Math.min(resumeOffset, buffer.length)
-  let cursor = start
+  let start = 0
+  let cursor = baseOffset
   while (start < buffer.length) {
     const newline = buffer.indexOf(0x0a, start)
     if (newline === -1) break
@@ -54,13 +86,13 @@ export async function readJsonl(path: string, resumeOffset = 0): Promise<JsonlRe
     const text = buffer.toString("utf8", start, newline).trim()
     if (text) {
       try {
-        lines.push({ value: JSON.parse(text), end })
+        lines.push({ value: JSON.parse(text), end: baseOffset + end })
       } catch {
         malformed++
       }
     }
     start = end
-    cursor = end
+    cursor = baseOffset + end
   }
   return { lines, cursor, malformed }
 }
@@ -77,7 +109,7 @@ export async function readJsonFile(path: string): Promise<unknown> {
 /** Recursively list files under root whose name passes the filter. */
 export async function walkFiles(
   root: string,
-  filter: (name: string) => boolean,
+  filter: (name: string) => boolean
 ): Promise<string[]> {
   const found: string[] = []
   let entries
@@ -99,7 +131,12 @@ export async function walkFiles(
 
 /** Coerce a token count that may be absent, a string, or fractional. */
 export function tokenCount(value: unknown): number {
-  const n = typeof value === "string" ? Number(value) : typeof value === "number" ? value : 0
+  const n =
+    typeof value === "string"
+      ? Number(value)
+      : typeof value === "number"
+        ? value
+        : 0
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
 }
 

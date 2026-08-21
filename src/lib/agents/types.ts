@@ -24,16 +24,22 @@ export interface ParseContext {
   timezone: string
   /** Byte offset to resume from, for append-only sources. Undefined = parse all. */
   resumeOffset?: number
+  /** Opaque adapter state persisted alongside the resume offset. */
+  resumeState?: string
   warn: (message: string) => void
 }
 
 export interface ParseOutput {
   events: UsageEvent[]
+  /** Delete previously persisted events before inserting this full parse. */
+  replaceExisting?: boolean
   /**
    * Byte offset consumed up to the last complete record, for append-only
    * sources. Omit when resume is unsafe (rewritten or non-linear formats).
    */
   cursor?: number
+  /** Opaque adapter state required to continue from the cursor. */
+  state?: string
 }
 
 /**
@@ -53,7 +59,10 @@ export interface AgentAdapter {
 }
 
 /** Read an env var, ignoring blank or whitespace-only values. */
-export function envPath(env: DiscoveryContext["env"], name: string): string | undefined {
+export function envPath(
+  env: DiscoveryContext["env"],
+  name: string
+): string | undefined {
   const value = env[name]?.trim()
   return value ? value : undefined
 }

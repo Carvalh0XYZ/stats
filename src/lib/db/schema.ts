@@ -2,7 +2,7 @@ import Database from "better-sqlite3"
 import { mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 /** Open (creating directories and tables as needed) the stats database. */
 export function openDatabase(path: string): Database.Database {
@@ -57,6 +57,7 @@ function migrate(db: Database.Database): void {
       mtime_ms INTEGER NOT NULL,
       sample_hash TEXT NOT NULL,
       cursor INTEGER,
+      resume_state TEXT,
       warnings INTEGER NOT NULL DEFAULT 0,
       error TEXT,
       last_synced_at INTEGER NOT NULL
@@ -85,5 +86,9 @@ function migrate(db: Database.Database): void {
       value TEXT NOT NULL
     );
   `)
+  const sourceColumns = db.pragma("table_info(sources)") as { name: string }[]
+  if (!sourceColumns.some((column) => column.name === "resume_state")) {
+    db.exec("ALTER TABLE sources ADD COLUMN resume_state TEXT")
+  }
   db.pragma(`user_version = ${SCHEMA_VERSION}`)
 }
