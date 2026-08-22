@@ -71,9 +71,7 @@ function OverviewPage() {
 
   if (poll.error)
     return <ErrorState message={poll.error} onRetry={poll.refresh} />
-  // Keep rendering stale data during refetches; swapping to the skeleton on
-  // every range/filter change makes the whole page flash.
-  if (!poll.data) return <PageSkeleton />
+  if (poll.loading || !poll.data) return <PageSkeleton />
 
   const { overview, series, yearSeries, agents, models, sessions } = poll.data
   const filtered = (filter.agents?.length ?? 0) > 0 || filter.range !== "all"

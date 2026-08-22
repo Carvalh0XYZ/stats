@@ -28,7 +28,10 @@ export function usePoll<T>(
   key: string,
   intervalMs = 30_000
 ): PollState<T> {
-  const [data, setData] = React.useState<T | null>(null)
+  const [result, setResult] = React.useState<{
+    data: T
+    key: string
+  } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [updatedAt, setUpdatedAt] = React.useState<number | null>(null)
@@ -46,7 +49,7 @@ export function usePoll<T>(
       try {
         const next = await loadRef.current()
         if (!alive || id !== generation) return
-        setData(next)
+        setResult({ data: next, key })
         setError(null)
         setUpdatedAt(Date.now())
       } catch (cause) {
@@ -69,6 +72,8 @@ export function usePoll<T>(
   }, [key, tick, intervalMs])
 
   const refresh = React.useCallback(() => setTick((n) => n + 1), [])
+
+  const data = result?.key === key ? result.data : null
 
   return { data, error, loading, updatedAt, refresh }
 }

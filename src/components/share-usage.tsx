@@ -48,9 +48,11 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
       const [overview, series, models] = await Promise.all([
         getJson<OverviewStats>(statsUrl("overview", filter)),
         getJson<TimeSeries>(statsUrl("timeseries", filter)),
-        getJson<BreakdownRow[]>(
-          statsUrl("breakdown", filter, { dimension: "model" })
-        ),
+        (filter.models?.length ?? 0) > 0
+          ? []
+          : getJson<BreakdownRow[]>(
+              statsUrl("breakdown", filter, { dimension: "model" })
+            ),
       ])
       return createUsageShareAsset({ overview, series, models, filter })
     }
