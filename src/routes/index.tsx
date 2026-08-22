@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react"
-import { createPortal } from "react-dom"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import {
   RiCoinsLine,
@@ -34,7 +32,6 @@ import {
   UsageChartCard,
 } from "@/components/charts"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
-import { UsageShareSheet } from "@/components/share-usage"
 
 export const Route = createFileRoute("/")({
   validateSearch: parseStatsSearch,
@@ -51,12 +48,6 @@ interface OverviewData {
 }
 
 function OverviewPage() {
-  const toolbar = useSyncExternalStore(
-    () => () => undefined,
-    () => document.getElementById("overview-toolbar-action"),
-    () => null
-  )
-
   const filter = Route.useSearch()
   const poll = usePoll<OverviewData>(async () => {
     const yearFilter: StatsFilter = { range: "year", agents: filter.agents }
@@ -80,7 +71,9 @@ function OverviewPage() {
 
   if (poll.error)
     return <ErrorState message={poll.error} onRetry={poll.refresh} />
-  if (poll.loading || !poll.data) return <PageSkeleton />
+  // Keep rendering stale data during refetches; swapping to the skeleton on
+  // every range/filter change makes the whole page flash.
+  if (!poll.data) return <PageSkeleton />
 
   const { overview, series, yearSeries, agents, models, sessions } = poll.data
   const filtered = (filter.agents?.length ?? 0) > 0 || filter.range !== "all"
@@ -92,12 +85,6 @@ function OverviewPage() {
   return (
     <div className="flex flex-col">
       <h1 className="sr-only">Overview</h1>
-      {toolbar
-        ? createPortal(
-            <UsageShareSheet source={{ overview, series, models, filter }} />,
-            toolbar
-          )
-        : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile
@@ -329,7 +316,9 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className={`min-w-0 rounded-2xl bg-muted/50 p-5 ${className ?? ""}`}>
+    <section
+      className={`min-w-0 rounded-2xl bg-muted/50 p-5 ${className ?? ""}`}
+    >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
           <p className="text-[13px] text-muted-foreground">{label}</p>

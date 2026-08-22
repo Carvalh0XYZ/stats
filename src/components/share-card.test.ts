@@ -85,7 +85,7 @@ function model(label: string, total: number): BreakdownRow {
 }
 
 describe("usage share card", () => {
-  it("places short time series into twelve equal bins and handles no points", () => {
+  it("downsamples the series into at most 48 chart values", () => {
     const short = createUsageShareSnapshot(
       source({
         series: {
@@ -100,12 +100,29 @@ describe("usage share card", () => {
         },
       })
     )
-    expect(short.tokenBins).toEqual([10, 0, 0, 0, 20, 0, 0, 0, 30, 0, 0, 0])
+    expect(short.tokenBins).toEqual([10, 20, 30])
+
+    const long = createUsageShareSnapshot(
+      source({
+        series: {
+          bucketMs: 1,
+          points: Array.from({ length: 96 }, (_, index) => ({
+            t: index,
+            tokens: 1,
+            costUsd: 0,
+            events: 1,
+            byAgent: {},
+          })),
+        },
+      })
+    )
+    expect(long.tokenBins).toHaveLength(48)
+    expect(long.tokenBins.every((bin) => bin === 2)).toBe(true)
 
     const empty = createUsageShareSnapshot(
       source({ series: { bucketMs: 1, points: [] } })
     )
-    expect(empty.tokenBins).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(empty.tokenBins).toEqual([])
   })
 
   it("marks private filters without printing their values", () => {
@@ -123,7 +140,7 @@ describe("usage share card", () => {
 
     expect(filtered.scope).toEqual({ kind: "filtered" })
     expect(filtered.comparison).toEqual({ kind: "unavailable" })
-    expect(svg).toContain("FILTERED")
+    expect(svg).toContain("Filtered")
     expect(svg).not.toContain("private-model")
     expect(svg).not.toContain("/secret/project")
     expect(createUsageShareSnapshot(source()).scope).toEqual({ kind: "all" })
@@ -169,20 +186,12 @@ describe("usage share card", () => {
     expect(svg).toContain("…")
   })
 
-  it("renders combined data disclosures and the install command", () => {
-    const snapshot = createUsageShareSnapshot(
-      source({
-        overview: {
-          ...SOURCE.overview,
-          hasEstimatedTokens: true,
-          unpricedEventCount: 2,
-        },
-      })
-    )
+  it("renders the domain, install command, and caption", () => {
+    const snapshot = createUsageShareSnapshot(source())
     const svg = renderUsageShareSvg(snapshot)
     const caption = createUsageShareCaption(snapshot)
 
-    expect(svg).toContain("INCLUDES ESTIMATED TOKENS · SOME EVENTS UNPRICED")
+    expect(svg).toContain("telemetry.dev")
     expect(svg).toContain("npx @telemetry-dev/stats")
     expect(caption).toBe(
       "1,000 tokens across my local AI coding agents in the last 30 days.\n\nTrack yours: npx @telemetry-dev/stats"

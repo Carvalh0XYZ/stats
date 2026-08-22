@@ -5,9 +5,17 @@ import {
   RiTwitterXLine,
 } from "@remixicon/react"
 
-import type { UsageShareAsset, UsageShareSource } from "@/components/share-card"
+import type {
+  BreakdownRow,
+  OverviewStats,
+  StatsFilter,
+  TimeSeries,
+} from "@/lib/api/types"
+import type { UsageShareAsset } from "@/components/share-card"
 import { createUsageShareAsset } from "@/components/share-card"
+import { getJson, statsUrl } from "@/components/data/api"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Sheet,
   SheetContent,
@@ -22,9 +30,13 @@ type UsageShareState =
   | { kind: "idle" }
   | { kind: "rendering" }
   | { kind: "failed"; message: string }
-  | { kind: "ready"; asset: UsageShareAsset; actionError?: string }
+  | { kind: "ready"; asset: UsageShareAsset }
 
-export function UsageShareSheet({ source }: { source: UsageShareSource }) {
+/**
+ * Toolbar trigger plus the share sheet. Fetches its own snapshot when opened,
+ * so it can mount with the toolbar chrome before any page data loads.
+ */
+export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
   const [open, setOpen] = React.useState(false)
   const [state, setState] = React.useState<UsageShareState>({ kind: "idle" })
   const request = React.useRef(0)
@@ -32,7 +44,17 @@ export function UsageShareSheet({ source }: { source: UsageShareSource }) {
   const prepare = () => {
     const id = ++request.current
     setState({ kind: "rendering" })
-    void createUsageShareAsset(source).then(
+    const load = async () => {
+      const [overview, series, models] = await Promise.all([
+        getJson<OverviewStats>(statsUrl("overview", filter)),
+        getJson<TimeSeries>(statsUrl("timeseries", filter)),
+        getJson<BreakdownRow[]>(
+          statsUrl("breakdown", filter, { dimension: "model" })
+        ),
+      ])
+      return createUsageShareAsset({ overview, series, models, filter })
+    }
+    void load().then(
       (asset) => {
         if (request.current === id) {
           setState({ kind: "ready", asset })
@@ -58,34 +80,6 @@ export function UsageShareSheet({ source }: { source: UsageShareSource }) {
     }
   }
 
-  const canShare =
-    state.kind === "ready" &&
-    typeof navigator !== "undefined" &&
-    typeof navigator.share === "function" &&
-    navigator.canShare({ files: [state.asset.file] })
-
-  const share = async () => {
-    if (state.kind !== "ready") return
-
-    try {
-      await navigator.share({
-        files: [state.asset.file],
-        text: state.asset.caption,
-      })
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return
-      setState((current) =>
-        current.kind === "ready"
-          ? {
-              ...current,
-              actionError:
-                "Could not open the share sheet. Try downloading instead.",
-            }
-          : current
-      )
-    }
-  }
-
   const download = () => {
     if (state.kind !== "ready") return
 
@@ -104,7 +98,13 @@ export function UsageShareSheet({ source }: { source: UsageShareSource }) {
     <Sheet open={open} onOpenChange={changeOpen}>
       <SheetTrigger
         render={
-          <Button variant="outline" size="sm" className="min-h-10 md:min-h-7" />
+          <Button
+            variant="outline"
+            size="sm"
+            // Stretches to the toolbar row so it matches the date range
+            // group's outer height; min-h keeps the mobile tap target.
+            className="h-auto min-h-10 self-stretch md:min-h-7"
+          />
         }
       >
         <RiShareForward2Line aria-hidden />
@@ -114,89 +114,98 @@ export function UsageShareSheet({ source }: { source: UsageShareSource }) {
         <SheetHeader>
           <SheetTitle>Share your stats</SheetTitle>
           <SheetDescription>
-            Preview your usage card. Project names, session names, and filter
-            values are never included.
+            Your usage for this period, rendered as an image. Project names,
+            session names, and filter values are never included.
           </SheetDescription>
         </SheetHeader>
 
-        <div className="px-4">
-          <div className="aspect-video overflow-hidden rounded-xl border bg-muted">
-            {state.kind === "ready" ? (
-              <img
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(state.asset.svg)}`}
-                alt={state.asset.altText}
-                className="h-full w-full object-contain"
-              />
-            ) : state.kind === "failed" ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
-                <p className="text-sm text-destructive" role="alert">
-                  {state.message}
-                </p>
-                <Button variant="outline" onClick={prepare}>
-                  Try again
-                </Button>
-              </div>
-            ) : (
-              <div
-                className="flex h-full animate-pulse items-center justify-center"
-                role="status"
-              >
-                <span className="text-sm text-muted-foreground">
-                  Preparing image…
-                </span>
-              </div>
-            )}
-          </div>
+        <div className="flex flex-col gap-4 px-4">
+          {state.kind === "ready" ? (
+            <img
+              src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(state.asset.svg)}`}
+              alt={state.asset.altText}
+              className="w-full"
+            />
+          ) : state.kind === "failed" ? (
+            <div
+              role="alert"
+              className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-destructive/30 p-6 text-center"
+            >
+              <p className="text-sm font-medium text-destructive">
+                Failed to render image
+              </p>
+              <p className="text-sm text-muted-foreground">{state.message}</p>
+              <Button variant="outline" size="sm" onClick={prepare}>
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <Skeleton className="aspect-video w-full rounded-xl" />
+          )}
+
+          {state.kind === "ready" ? (
+            <div className="rounded-xl bg-muted/50 p-4">
+              <p className="text-[13px] text-muted-foreground">Caption</p>
+              <p className="mt-1 text-sm whitespace-pre-wrap">
+                {state.asset.caption}
+              </p>
+            </div>
+          ) : state.kind === "failed" ? null : (
+            <Skeleton className="h-24 rounded-xl" />
+          )}
         </div>
 
-        <SheetFooter className="border-t">
-          {state.kind === "ready" ? (
-            <>
-              <Button
-                className="w-full"
-                onClick={download}
-                render={
-                  <a
-                    href={state.asset.xIntentUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  />
-                }
-              >
-                <RiTwitterXLine aria-hidden />
-                Post on X
-              </Button>
-              {canShare ? (
-                <Button
-                  className="w-full"
-                  variant="outline"
-                  onClick={() => void share()}
-                >
-                  <RiShareForward2Line aria-hidden />
-                  Share image
-                </Button>
-              ) : null}
-              <Button className="w-full" variant="outline" onClick={download}>
-                <RiDownloadLine aria-hidden />
-                Download image
-              </Button>
-              <p className="text-xs text-pretty text-muted-foreground">
-                {canShare
-                  ? "Post on X opens with your caption and downloads the image to attach. Share image can attach it directly."
-                  : "Post on X opens with your caption and downloads the image to attach."}
-              </p>
-            </>
-          ) : state.kind === "failed" ? null : (
-            <Button className="w-full" disabled>
-              Preparing image…
-            </Button>
-          )}
-          {state.kind === "ready" && state.actionError ? (
-            <p className="text-xs text-destructive" role="alert">
-              {state.actionError}
+        {state.kind === "failed" ? null : (
+          <SheetFooter className="border-t">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {state.kind === "ready" ? (
+                <>
+                  <Button
+                    className="w-full sm:flex-1"
+                    onClick={download}
+                    render={
+                      <a
+                        href={state.asset.xIntentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      />
+                    }
+                  >
+                    <RiTwitterXLine aria-hidden />
+                    Post on X
+                  </Button>
+                  <Button
+                    className="w-full sm:flex-1"
+                    variant="outline"
+                    onClick={download}
+                  >
+                    <RiDownloadLine aria-hidden />
+                    Download image
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button className="w-full sm:flex-1" disabled>
+                    <RiTwitterXLine aria-hidden />
+                    Post on X
+                  </Button>
+                  <Button
+                    className="w-full sm:flex-1"
+                    variant="outline"
+                    disabled
+                  >
+                    <RiDownloadLine aria-hidden />
+                    Download image
+                  </Button>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-pretty text-muted-foreground">
+              Posting opens your X draft with the caption and downloads the
+              image so you can attach it.
             </p>
-          ) : null}
-        </SheetFooter>
+          </SheetFooter>
+        )}
       </SheetContent>
     </Sheet>
   )
