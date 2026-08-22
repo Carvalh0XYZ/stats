@@ -236,7 +236,7 @@ export function renderUsageShareSvg(
 
     <rect x="48" y="607" width="314" height="40" rx="8" fill="${TILE}" stroke="${INK}" stroke-opacity=".09"/>
     <text x="64" y="633" class="mono" font-size="18"><tspan fill="${MUTED_FG}">$ </tspan><tspan fill="${INK}" font-weight="500">npx @telemetry-dev/stats</tspan></text>
-    <text x="1152" y="633" class="mono" fill="${MUTED_FG}" font-size="15" text-anchor="end">telemetry.dev</text>
+    <text x="1152" y="633" class="mono" fill="${MUTED_FG}" font-size="18" text-anchor="end">telemetry.dev</text>
   </g>
   <rect x=".5" y=".5" width="${CARD_WIDTH - 1}" height="${CARD_HEIGHT - 1}" rx="23.5" fill="none" stroke="${INK}" stroke-opacity=".09"/>
 </svg>`
