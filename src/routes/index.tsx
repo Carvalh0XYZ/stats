@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 import { createFileRoute, Link } from "@tanstack/react-router"
 import {
   RiCoinsLine,
@@ -32,6 +34,7 @@ import {
   UsageChartCard,
 } from "@/components/charts"
 import { EmptyState, ErrorState, PageSkeleton } from "@/components/states"
+import { UsageShareSheet } from "@/components/share-usage"
 
 export const Route = createFileRoute("/")({
   validateSearch: parseStatsSearch,
@@ -48,6 +51,12 @@ interface OverviewData {
 }
 
 function OverviewPage() {
+  const toolbar = useSyncExternalStore(
+    () => () => undefined,
+    () => document.getElementById("overview-toolbar-action"),
+    () => null
+  )
+
   const filter = Route.useSearch()
   const poll = usePoll<OverviewData>(async () => {
     const yearFilter: StatsFilter = { range: "year", agents: filter.agents }
@@ -83,6 +92,12 @@ function OverviewPage() {
   return (
     <div className="flex flex-col">
       <h1 className="sr-only">Overview</h1>
+      {toolbar
+        ? createPortal(
+            <UsageShareSheet source={{ overview, series, models, filter }} />,
+            toolbar
+          )
+        : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile

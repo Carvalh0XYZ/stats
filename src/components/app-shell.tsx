@@ -197,26 +197,29 @@ function Toolbar() {
           />
         ))}
       </div>
-      <div
-        role="group"
-        aria-label="Date range"
-        className="flex rounded-md border p-0.5"
-      >
-        {TIME_RANGES.map((value) => (
-          <button
-            key={value}
-            type="button"
-            aria-pressed={range === value}
-            onClick={() => setRange(value)}
-            className={`min-h-10 rounded-[calc(var(--radius)-2px)] px-2.5 text-[13px] tabular-nums focus-visible:ring-2 focus-visible:ring-ring md:min-h-7 ${
-              range === value
-                ? "bg-muted font-medium text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {RANGE_LABELS[value]}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          role="group"
+          aria-label="Date range"
+          className="flex rounded-md border p-0.5"
+        >
+          {TIME_RANGES.map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={range === value}
+              onClick={() => setRange(value)}
+              className={`min-h-10 rounded-[calc(var(--radius)-2px)] px-2.5 text-[13px] tabular-nums focus-visible:ring-2 focus-visible:ring-ring md:min-h-7 ${
+                range === value
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {RANGE_LABELS[value]}
+            </button>
+          ))}
+        </div>
+        <div id="overview-toolbar-action" className="contents" />
       </div>
     </div>
   )
