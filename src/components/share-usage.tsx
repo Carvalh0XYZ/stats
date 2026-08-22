@@ -99,11 +99,11 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
       <SheetTrigger
         render={
           <Button
-            variant="outline"
             size="sm"
             // Stretches to the toolbar row so it matches the date range
-            // group's outer height; min-h keeps the mobile tap target.
-            className="h-auto min-h-10 self-stretch md:min-h-7"
+            // group's outer height; min-h keeps the mobile tap target. The
+            // solid primary fill marks this as the page's key action.
+            className="h-auto min-h-10 self-stretch px-3 md:min-h-7"
           />
         }
       >
@@ -163,6 +163,7 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
                   <Button
                     className="w-full sm:flex-1"
                     onClick={download}
+                    nativeButton={false}
                     render={
                       <a
                         href={state.asset.xIntentUrl}

@@ -15,12 +15,12 @@ import {
   XIcon,
 } from "lucide-react"
 
-import { AGENTS, AGENT_IDS  } from "@/lib/agents/registry"
-import type {AgentId} from "@/lib/agents/registry";
+import { AGENTS, AGENT_IDS } from "@/lib/agents/registry"
+import type { AgentId } from "@/lib/agents/registry"
 import type { StatsFilter, SyncStatus, TimeRange } from "@/lib/api/types"
 import { TIME_RANGES } from "@/lib/api/types"
 import { getJson } from "@/components/data/api"
-import { usePoll } from "@/components/data/use-poll"
+import { refreshPolls, usePoll } from "@/components/data/use-poll"
 import { formatRelative } from "@/components/data/format"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -353,7 +353,28 @@ function AgentFilter({
 }
 
 function SyncControl() {
-  const poll = usePoll(() => getJson<SyncStatus>("/api/sync"), "sync", 5_000)
+  // undefined = no status seen yet; null = seen, but no finished run.
+  const lastFinished = React.useRef<number | null | undefined>(undefined)
+  const poll = usePoll(
+    async () => {
+      const status = await getJson<SyncStatus>("/api/sync")
+      const finishedAt = status.lastRun?.finishedAt ?? null
+      // A new finishedAt means a sync completed (here, another tab, or the
+      // CLI): push the new rows to the open page instead of waiting out the
+      // 30s data poll.
+      if (
+        lastFinished.current !== undefined &&
+        finishedAt !== null &&
+        finishedAt !== lastFinished.current
+      ) {
+        refreshPolls()
+      }
+      lastFinished.current = finishedAt
+      return status
+    },
+    "sync",
+    5_000
+  )
   const [starting, setStarting] = React.useState(false)
   const running = starting || (poll.data?.running ?? false)
   const finishedAt = poll.data?.lastRun?.finishedAt ?? null
@@ -423,6 +444,7 @@ function GitHubLink() {
       size="icon"
       aria-label="GitHub repository"
       className="min-h-11 min-w-11 md:min-h-8 md:min-w-8"
+      nativeButton={false}
       render={
         <a
           href="https://github.com/telemetry-dev/stats"
