@@ -60,10 +60,9 @@ export type UsageShareScope = { kind: "all" } | { kind: "filtered" }
 export type UsageShareComparison =
   { kind: "percent"; value: number } | { kind: "unavailable" }
 
-export interface UsageShareModel {
-  label: string
-  share: number
-}
+export type UsageShareModel =
+  | { kind: "model"; label: string; share: number }
+  | { kind: "remainder"; label: "Other"; share: number }
 
 export interface UsageShareSnapshot {
   period: {
@@ -118,8 +117,8 @@ export function createUsageShareSnapshot(
     change !== null && Number.isFinite(change)
       ? { kind: "percent", value: change }
       : { kind: "unavailable" }
-  const first = overview.firstTimestamp ?? series.points.at(0)?.t ?? null
-  const last = overview.lastTimestamp ?? series.points.at(-1)?.t ?? null
+  const first = series.points.at(0)?.t ?? overview.firstTimestamp ?? null
+  const last = series.points.at(-1)?.t ?? overview.lastTimestamp ?? null
   return {
     period: {
       ...period,
@@ -153,7 +152,7 @@ export function createUsageShareCaption(snapshot: UsageShareSnapshot): string {
 
 export function createUsageShareAlt(snapshot: UsageShareSnapshot): string {
   const modelSummary = snapshot.models
-    .filter((model) => model.label !== "Other")
+    .filter((model) => model.kind === "model")
     .map((model) => `${model.label} ${formatShare(model.share)}`)
     .join(", ")
   const mix = modelSummary ? ` Model mix: ${modelSummary}.` : ""
@@ -264,14 +263,17 @@ function makeModelMix(
   const total = ranked.reduce((sum, row) => sum + row.tokens.total, 0)
   if (total === 0) return []
 
-  const top = ranked.slice(0, 3).map((row) => ({
+  const top = ranked.slice(0, 3).map((row): UsageShareModel => ({
+    kind: "model",
     label: row.label,
     share: row.tokens.total / total,
   }))
   const shown = top.reduce((sum, model) => sum + model.share, 0)
   const other = Math.max(0, 1 - shown)
 
-  return ranked.length > 3 ? [...top, { label: "Other", share: other }] : top
+  return ranked.length > 3
+    ? [...top, { kind: "remainder", label: "Other", share: other }]
+    : top
 }
 
 /** Delta chip in the hero tile's top-right corner, like the StatTile chips. */
@@ -360,7 +362,7 @@ function renderModelMix(models: readonly UsageShareModel[]): string {
 
   const shown = models.slice(0, 4)
   const colors = shown.map((model, index) =>
-    model.label === "Other" ? OTHER_COLOR : CHART_COLORS[index]
+    model.kind === "remainder" ? OTHER_COLOR : CHART_COLORS[index]
   )
 
   let cursor = 748

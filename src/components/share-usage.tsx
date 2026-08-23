@@ -105,7 +105,7 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
             // Stretches to the toolbar row so it matches the date range
             // group's outer height; min-h keeps the mobile tap target. The
             // solid primary fill marks this as the page's key action.
-            className="h-auto min-h-10 self-stretch px-3 md:min-h-7"
+            className="h-auto min-h-11 self-stretch px-3 md:min-h-7"
           />
         }
       >
@@ -137,7 +137,12 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
                 Failed to render image
               </p>
               <p className="text-sm text-muted-foreground">{state.message}</p>
-              <Button variant="outline" size="sm" onClick={prepare}>
+              <Button
+                className="min-h-11 md:min-h-7"
+                variant="outline"
+                size="sm"
+                onClick={prepare}
+              >
                 Retry
               </Button>
             </div>
@@ -163,7 +168,7 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
               {state.kind === "ready" ? (
                 <>
                   <Button
-                    className="w-full sm:flex-1"
+                    className="min-h-11 w-full sm:flex-1 md:min-h-8"
                     onClick={download}
                     nativeButton={false}
                     render={
@@ -178,7 +183,7 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
                     Post on X
                   </Button>
                   <Button
-                    className="w-full sm:flex-1"
+                    className="min-h-11 w-full sm:flex-1 md:min-h-8"
                     variant="outline"
                     onClick={download}
                   >
@@ -188,12 +193,15 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
                 </>
               ) : (
                 <>
-                  <Button className="w-full sm:flex-1" disabled>
+                  <Button
+                    className="min-h-11 w-full sm:flex-1 md:min-h-8"
+                    disabled
+                  >
                     <RiTwitterXLine aria-hidden />
                     Post on X
                   </Button>
                   <Button
-                    className="w-full sm:flex-1"
+                    className="min-h-11 w-full sm:flex-1 md:min-h-8"
                     variant="outline"
                     disabled
                   >

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import type { BreakdownRow } from "@/lib/api/types"
 import type { UsageShareSource } from "@/components/share-card"
 import {
+  createUsageShareAlt,
   createUsageShareCaption,
   createUsageShareSnapshot,
   renderUsageShareSvg,
@@ -125,6 +126,34 @@ describe("usage share card", () => {
     expect(empty.tokenBins).toEqual([])
   })
 
+  it("labels the chart with the series endpoints", () => {
+    const start = new Date(2026, 6, 1).getTime()
+    const activity = new Date(2026, 6, 15).getTime()
+    const end = new Date(2026, 6, 30).getTime()
+    const snapshot = createUsageShareSnapshot(
+      source({
+        overview: {
+          ...SOURCE.overview,
+          firstTimestamp: activity,
+          lastTimestamp: activity,
+        },
+        series: {
+          bucketMs: 24 * 60 * 60 * 1000,
+          points: [start, activity, end].map((t, index) => ({
+            t,
+            tokens: index === 1 ? 1000 : 0,
+            costUsd: index === 1 ? 12.5 : 0,
+            events: index === 1 ? 20 : 0,
+            byAgent: {},
+          })),
+        },
+      })
+    )
+
+    expect(snapshot.period.startLabel).toBe("Jul 1")
+    expect(snapshot.period.endLabel).toBe("Jul 30")
+  })
+
   it("marks private filters without printing their values", () => {
     const filtered = createUsageShareSnapshot(
       source({
@@ -171,6 +200,23 @@ describe("usage share card", () => {
     expect(
       snapshot.models.reduce((sum, item) => sum + item.share, 0)
     ).toBeCloseTo(1)
+  })
+
+  it("keeps a model named Other distinct from the remainder", () => {
+    const snapshot = createUsageShareSnapshot(
+      source({
+        models: [
+          model("Other", 40),
+          model("Model B", 30),
+          model("Model C", 20),
+          model("Model D", 10),
+        ],
+      })
+    )
+    const alt = createUsageShareAlt(snapshot)
+
+    expect(alt).toContain("Model mix: Other 40%, Model B 30%, Model C 20%.")
+    expect(alt).not.toContain("Other 10%")
   })
 
   it("clips and escapes model labels before adding them to SVG", () => {
