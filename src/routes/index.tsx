@@ -314,7 +314,9 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className={`min-w-0 rounded-2xl bg-muted/50 p-5 ${className ?? ""}`}>
+    <section
+      className={`min-w-0 rounded-2xl bg-muted/50 p-5 ${className ?? ""}`}
+    >
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
           <p className="text-[13px] text-muted-foreground">{label}</p>

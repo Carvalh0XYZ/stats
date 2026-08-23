@@ -8,6 +8,30 @@ export interface PollState<T> {
   refresh: () => void
 }
 
+const refreshListeners = new Set<() => void>()
+
+/**
+ * Refetches every active data listener in place, without a loading flip. Lets
+ * the sync control push fresh data to the page as soon as a sync completes.
+ */
+export function refreshPolls() {
+  for (const listener of refreshListeners) listener()
+}
+
+export function usePollRefresh(refresh: () => void, active = true) {
+  React.useEffect(() => {
+    if (!active) return
+    return onPollRefresh(refresh)
+  }, [active, refresh])
+}
+
+function onPollRefresh(listener: () => void) {
+  refreshListeners.add(listener)
+  return () => {
+    refreshListeners.delete(listener)
+  }
+}
+
 /**
  * Fetches on mount and every `intervalMs` (default 30s), refetching whenever
  * `key` changes. Stale responses from superseded requests are dropped.
@@ -17,8 +41,14 @@ export function usePoll<T>(
   key: string,
   intervalMs = 30_000
 ): PollState<T> {
-  const [data, setData] = React.useState<T | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
+  const [result, setResult] = React.useState<{
+    data: T
+    key: string
+  } | null>(null)
+  const [failure, setFailure] = React.useState<{
+    key: string
+    message: string
+  } | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [updatedAt, setUpdatedAt] = React.useState<number | null>(null)
   const [tick, setTick] = React.useState(0)
@@ -35,12 +65,15 @@ export function usePoll<T>(
       try {
         const next = await loadRef.current()
         if (!alive || id !== generation) return
-        setData(next)
-        setError(null)
+        setResult({ data: next, key })
+        setFailure(null)
         setUpdatedAt(Date.now())
       } catch (cause) {
         if (!alive || id !== generation) return
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setFailure({
+          key,
+          message: cause instanceof Error ? cause.message : String(cause),
+        })
       } finally {
         if (alive && id === generation) setLoading(false)
       }
@@ -48,13 +81,18 @@ export function usePoll<T>(
 
     void run(true)
     const timer = setInterval(() => void run(false), intervalMs)
+    const removeListener = onPollRefresh(() => void run(false))
     return () => {
       alive = false
       clearInterval(timer)
+      removeListener()
     }
   }, [key, tick, intervalMs])
 
   const refresh = React.useCallback(() => setTick((n) => n + 1), [])
+
+  const data = result?.key === key ? result.data : null
+  const error = failure?.key === key ? failure.message : null
 
   return { data, error, loading, updatedAt, refresh }
 }
