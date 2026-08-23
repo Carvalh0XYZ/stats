@@ -28,59 +28,78 @@ import {
 
 type UsageShareState =
   | { kind: "idle" }
-  | { kind: "rendering" }
-  | { kind: "failed"; message: string }
-  | { kind: "ready"; asset: UsageShareAsset }
+  | { kind: "rendering"; filterKey: string }
+  | { kind: "failed"; filterKey: string; message: string }
+  | { kind: "ready"; filterKey: string; asset: UsageShareAsset }
 
 /**
- * Toolbar trigger plus the share sheet. Fetches its own snapshot when opened,
- * so it can mount with the toolbar chrome before any page data loads.
+ * Toolbar trigger plus the share sheet. Fetches its own snapshot when opened
+ * or when the active filter changes.
  */
 export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
+  const filterKey = JSON.stringify(filter)
   const [open, setOpen] = React.useState(false)
-  const [state, setState] = React.useState<UsageShareState>({ kind: "idle" })
+  const [result, setResult] = React.useState<UsageShareState>({ kind: "idle" })
   const request = React.useRef(0)
+  const filterRef = React.useRef(filter)
+  filterRef.current = filter
 
-  const prepare = () => {
+  const prepare = React.useCallback(() => {
+    const nextFilter = filterRef.current
+    const nextFilterKey = JSON.stringify(nextFilter)
     const id = ++request.current
-    setState({ kind: "rendering" })
+    setResult({ kind: "rendering", filterKey: nextFilterKey })
     const load = async () => {
       const [overview, series, models] = await Promise.all([
-        getJson<OverviewStats>(statsUrl("overview", filter)),
-        getJson<TimeSeries>(statsUrl("timeseries", filter)),
-        (filter.models?.length ?? 0) > 0
+        getJson<OverviewStats>(statsUrl("overview", nextFilter)),
+        getJson<TimeSeries>(statsUrl("timeseries", nextFilter)),
+        (nextFilter.models?.length ?? 0) > 0
           ? []
           : getJson<BreakdownRow[]>(
-              statsUrl("breakdown", filter, { dimension: "model" })
+              statsUrl("breakdown", nextFilter, { dimension: "model" })
             ),
       ])
-      return createUsageShareAsset({ overview, series, models, filter })
+      return createUsageShareAsset({
+        overview,
+        series,
+        models,
+        filter: nextFilter,
+      })
     }
     void load().then(
       (asset) => {
         if (request.current === id) {
-          setState({ kind: "ready", asset })
+          setResult({ kind: "ready", filterKey: nextFilterKey, asset })
         }
       },
       () => {
         if (request.current === id) {
-          setState({
+          setResult({
             kind: "failed",
+            filterKey: nextFilterKey,
             message: "Could not prepare the image. Try again.",
           })
         }
       }
     )
-  }
+  }, [])
+
+  React.useEffect(() => {
+    if (open) prepare()
+  }, [filterKey, open, prepare])
 
   const changeOpen = (next: boolean) => {
     setOpen(next)
-    if (next) prepare()
-    else {
+    if (!next) {
       request.current++
-      setState({ kind: "idle" })
+      setResult({ kind: "idle" })
     }
   }
+
+  const state: UsageShareState =
+    result.kind === "idle" || result.filterKey === filterKey
+      ? result
+      : { kind: "rendering", filterKey }
 
   const download = () => {
     if (state.kind !== "ready") return

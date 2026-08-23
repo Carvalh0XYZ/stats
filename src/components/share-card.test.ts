@@ -166,10 +166,16 @@ describe("usage share card", () => {
       })
     )
     const svg = renderUsageShareSvg(filtered)
+    const caption = createUsageShareCaption(filtered)
+    const alt = createUsageShareAlt(filtered)
 
     expect(filtered.scope).toEqual({ kind: "filtered" })
     expect(filtered.comparison).toEqual({ kind: "unavailable" })
     expect(svg).toContain("Filtered")
+    expect(caption).toContain("in the last 30 days (filtered view).")
+    expect(alt).toContain(
+      "total tokens from a filtered view in the last 30 days"
+    )
     expect(svg).not.toContain("private-model")
     expect(svg).not.toContain("/secret/project")
     expect(createUsageShareSnapshot(source()).scope).toEqual({ kind: "all" })

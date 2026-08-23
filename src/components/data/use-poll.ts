@@ -32,7 +32,10 @@ export function usePoll<T>(
     data: T
     key: string
   } | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
+  const [failure, setFailure] = React.useState<{
+    key: string
+    message: string
+  } | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [updatedAt, setUpdatedAt] = React.useState<number | null>(null)
   const [tick, setTick] = React.useState(0)
@@ -50,11 +53,14 @@ export function usePoll<T>(
         const next = await loadRef.current()
         if (!alive || id !== generation) return
         setResult({ data: next, key })
-        setError(null)
+        setFailure(null)
         setUpdatedAt(Date.now())
       } catch (cause) {
         if (!alive || id !== generation) return
-        setError(cause instanceof Error ? cause.message : String(cause))
+        setFailure({
+          key,
+          message: cause instanceof Error ? cause.message : String(cause),
+        })
       } finally {
         if (alive && id === generation) setLoading(false)
       }
@@ -74,6 +80,7 @@ export function usePoll<T>(
   const refresh = React.useCallback(() => setTick((n) => n + 1), [])
 
   const data = result?.key === key ? result.data : null
+  const error = failure?.key === key ? failure.message : null
 
   return { data, error, loading, updatedAt, refresh }
 }

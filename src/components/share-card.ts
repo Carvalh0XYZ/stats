@@ -147,7 +147,8 @@ export function createUsageShareSnapshot(
 }
 
 export function createUsageShareCaption(snapshot: UsageShareSnapshot): string {
-  return `${formatTokens(snapshot.totalTokens)} tokens across my local AI coding agents in ${snapshot.period.caption}.\n\nTrack yours: npx @telemetry-dev/stats`
+  const scope = snapshot.scope.kind === "filtered" ? " (filtered view)" : ""
+  return `${formatTokens(snapshot.totalTokens)} tokens across my local AI coding agents in ${snapshot.period.caption}${scope}.\n\nTrack yours: npx @telemetry-dev/stats`
 }
 
 export function createUsageShareAlt(snapshot: UsageShareSnapshot): string {
@@ -156,8 +157,10 @@ export function createUsageShareAlt(snapshot: UsageShareSnapshot): string {
     .map((model) => `${model.label} ${formatShare(model.share)}`)
     .join(", ")
   const mix = modelSummary ? ` Model mix: ${modelSummary}.` : ""
+  const scope =
+    snapshot.scope.kind === "filtered" ? " from a filtered view" : ""
 
-  return `Telemetry Stats card showing ${formatTokens(snapshot.totalTokens)} total tokens in ${snapshot.period.caption}, ${formatCount(snapshot.stats.sessions)} sessions, and ${formatCount(snapshot.stats.activeDays)} active days.${mix}`
+  return `Telemetry Stats card showing ${formatTokens(snapshot.totalTokens)} total tokens${scope} in ${snapshot.period.caption}, ${formatCount(snapshot.stats.sessions)} sessions, and ${formatCount(snapshot.stats.activeDays)} active days.${mix}`
 }
 
 export async function createUsageShareAsset(
