@@ -11,12 +11,25 @@ export interface PollState<T> {
 const refreshListeners = new Set<() => void>()
 
 /**
- * Refetches every mounted poll in place, without a loading flip. Lets the
- * sync control push fresh data to the pages as soon as a sync completes,
- * instead of them waiting out their poll interval.
+ * Refetches every active data listener in place, without a loading flip. Lets
+ * the sync control push fresh data to the page as soon as a sync completes.
  */
 export function refreshPolls() {
   for (const listener of refreshListeners) listener()
+}
+
+export function usePollRefresh(refresh: () => void, active = true) {
+  React.useEffect(() => {
+    if (!active) return
+    return onPollRefresh(refresh)
+  }, [active, refresh])
+}
+
+function onPollRefresh(listener: () => void) {
+  refreshListeners.add(listener)
+  return () => {
+    refreshListeners.delete(listener)
+  }
 }
 
 /**
@@ -68,12 +81,11 @@ export function usePoll<T>(
 
     void run(true)
     const timer = setInterval(() => void run(false), intervalMs)
-    const listener = () => void run(false)
-    refreshListeners.add(listener)
+    const removeListener = onPollRefresh(() => void run(false))
     return () => {
       alive = false
       clearInterval(timer)
-      refreshListeners.delete(listener)
+      removeListener()
     }
   }, [key, tick, intervalMs])
 

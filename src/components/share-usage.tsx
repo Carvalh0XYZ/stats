@@ -14,6 +14,7 @@ import type {
 import type { UsageShareAsset } from "@/components/share-card"
 import { createUsageShareAsset } from "@/components/share-card"
 import { getJson, statsUrl } from "@/components/data/api"
+import { usePollRefresh } from "@/components/data/use-poll"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -33,8 +34,8 @@ type UsageShareState =
   | { kind: "ready"; filterKey: string; asset: UsageShareAsset }
 
 /**
- * Toolbar trigger plus the share sheet. Fetches its own snapshot when opened
- * or when the active filter changes.
+ * Fetches a share snapshot when the sheet opens, its filter changes, or a
+ * sync finishes.
  */
 export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
   const filterKey = JSON.stringify(filter)
@@ -83,6 +84,7 @@ export function UsageShareSheet({ filter }: { filter: StatsFilter }) {
       }
     )
   }, [])
+  usePollRefresh(prepare, open)
 
   React.useEffect(() => {
     if (open) prepare()
