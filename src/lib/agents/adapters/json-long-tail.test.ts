@@ -54,8 +54,62 @@ describe("JSON long-tail adapters", () => {
       JSON.stringify({ id: "three", timestamp: 1785542402000, params: { update: { usage: { totalTokens: 120 } } } }),
       "",
     ].join("\n"))
-    const result = await grokBuildAdapter.parse((await paths(grokBuildAdapter, discovery(home)))[0]!, parseContext)
+    expect(grokBuildAdapter.version).toBe(2)
+    const result = await grokBuildAdapter.parse((await paths(grokBuildAdapter, discovery(home)))[0], parseContext)
     expect(result.events.map((event) => event.tokens.input)).toEqual([100, 45])
+  })
+
+  it("reads Grok turn_completed model, cache, reasoning, and billed ticks", async () => {
+    const home = await tempHome()
+    const root = join(home, ".grok", "sessions", "work", "session")
+    await fs.mkdir(root, { recursive: true })
+    await fs.writeFile(
+      join(root, "updates.jsonl"),
+      `${JSON.stringify({
+        timestamp: 1787942522,
+        method: "_x.ai/session/update",
+        params: {
+          sessionId: "session",
+          update: {
+            sessionUpdate: "turn_completed",
+            prompt_id: "prompt-1",
+            usage: {
+              inputTokens: 1000,
+              outputTokens: 250,
+              totalTokens: 1250,
+              cachedReadTokens: 400,
+              cacheCreationTokens: 50,
+              reasoningTokens: 80,
+              apiDurationMs: 1200,
+              costUsdTicks: 1_286_002_400,
+              modelUsage: {
+                "grok-4.6-build": {
+                  inputTokens: 1000,
+                  outputTokens: 250,
+                  totalTokens: 1250,
+                  cachedReadTokens: 400,
+                  cacheCreationTokens: 50,
+                  reasoningTokens: 80,
+                  costUsdTicks: 1_286_002_400,
+                },
+              },
+            },
+          },
+          _meta: { eventId: "event-1", agentTimestampMs: 1787942522235 },
+        },
+      })}\n`,
+    )
+    const result = await grokBuildAdapter.parse((await paths(grokBuildAdapter, discovery(home)))[0], parseContext)
+    expect(result.events).toHaveLength(1)
+    const event = result.events[0]
+    expect(event.model).toBe("grok-4.6")
+    expect(event.provider).toBe("xai")
+    expect(event.tokens).toEqual({ input: 550, output: 170, cacheRead: 400, cacheWrite: 50, reasoning: 80 })
+    expect(event.costUsd).toBeCloseTo(0.12860024)
+    expect(event.costSource).toBe("reported")
+    expect(event.durationMs).toBe(1200)
+    expect(event.timestamp).toBe(1787942522235)
+    expect(event.dedupKey).toBe("session:prompt-1")
   })
 
   it("marks Command Code message-length estimates", async () => {
