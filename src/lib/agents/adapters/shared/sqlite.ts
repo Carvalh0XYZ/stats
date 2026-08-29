@@ -26,6 +26,8 @@ export interface SqliteSpec {
   query: string
   map?: (row: Record<string, unknown>) => SqliteUsageRow | null
   attribute?: (row: SqliteUsageRow) => AgentId
+  /** Empty parse when `usage_events` is absent. Off by default so schema mismatches stay errors. */
+  allowMissingUsageEvents?: boolean
 }
 
 export async function parseSqliteUsage(
@@ -39,7 +41,11 @@ export async function parseSqliteUsage(
     try {
       rows = db.prepare(spec.query).all() as Record<string, unknown>[]
     } catch (error) {
-      if (error instanceof Error && /^no such table: usage_events$/i.test(error.message)) {
+      if (
+        spec.allowMissingUsageEvents &&
+        error instanceof Error &&
+        /^no such table: usage_events$/i.test(error.message)
+      ) {
         return { events: [] }
       }
       throw error

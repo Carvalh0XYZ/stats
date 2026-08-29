@@ -109,10 +109,10 @@ describe("SQLite usage adapters", () => {
     expect(output.events).toEqual([])
     await expect(
       parseSqliteUsage(source, parseContext, {
-        agent: "antigravity-cli",
-        query: "SELECT * FROM missing",
+        agent: "kilo-cli",
+        query: "SELECT * FROM usage_events",
       }),
-    ).rejects.toThrow("no such table: missing")
+    ).rejects.toThrow("no such table: usage_events")
   })
 
   it("discovers Antigravity, Kiro, and ZCode sources", async () => {
