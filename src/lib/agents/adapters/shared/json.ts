@@ -166,13 +166,24 @@ export const numberOf = number
 export const fileSession = sessionFromPath
 export const standardTokens = usage
 
-export function encodedProject(path: string, rootName: string): string | null {
+export function encodedProject(
+  path: string,
+  rootName: string,
+  decodePercent = false,
+): string | null {
   const parts = path.split(/[\\/]/u)
   const root = parts.lastIndexOf(rootName)
   const encoded = root >= 0 ? parts[root + 1] : undefined
   if (!encoded || root + 1 >= parts.length - 1) return null
   if (encoded.startsWith("--") && encoded.endsWith("--")) {
     return `/${encoded.slice(2, -2).replaceAll("--", "/")}`
+  }
+  if (decodePercent && encoded.includes("%")) {
+    try {
+      return decodeURIComponent(encoded)
+    } catch {
+      return encoded
+    }
   }
   return encoded.startsWith("-") ? encoded.replaceAll("-", "/") : encoded
 }

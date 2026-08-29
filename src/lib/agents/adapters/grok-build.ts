@@ -5,6 +5,7 @@ import { envPath } from "../types"
 import { fileAdapter } from "./shared/factory"
 import type { JsonRecord } from "./shared/json"
 import {
+  encodedProject,
   hasTokens,
   nested,
   number,
@@ -21,7 +22,7 @@ const USD_TICKS_PER_DOLLAR = 10_000_000_000
 export const grokBuildAdapter = fileAdapter({
   id: "grok-build",
   label: "Grok Build",
-  version: 2,
+  version: 3,
   roots: (context) => [
     join(
       envPath(context.env, "GROK_HOME") ?? join(context.home, ".grok"),
@@ -31,6 +32,7 @@ export const grokBuildAdapter = fileAdapter({
   file: (name) => name === "updates.jsonl",
   parse: async (source, context) => {
     let priorTotal = 0
+    const project = encodedProject(source.path, "sessions", true)
     return parseJsonl({
       agent: "grok-build",
       source,
@@ -63,6 +65,7 @@ export const grokBuildAdapter = fileAdapter({
         return {
           identity,
           sessionId: state.sessionId,
+          project,
           timestamp: at,
           tokens,
           model: grokModel(update, row, raw),

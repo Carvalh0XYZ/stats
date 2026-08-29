@@ -54,14 +54,14 @@ describe("JSON long-tail adapters", () => {
       JSON.stringify({ id: "three", timestamp: 1785542402000, params: { update: { usage: { totalTokens: 120 } } } }),
       "",
     ].join("\n"))
-    expect(grokBuildAdapter.version).toBe(2)
+    expect(grokBuildAdapter.version).toBe(3)
     const result = await grokBuildAdapter.parse((await paths(grokBuildAdapter, discovery(home)))[0], parseContext)
     expect(result.events.map((event) => event.tokens.input)).toEqual([100, 45])
   })
 
   it("reads Grok turn_completed model, cache, reasoning, and billed ticks", async () => {
     const home = await tempHome()
-    const root = join(home, ".grok", "sessions", "work", "session")
+    const root = join(home, ".grok", "sessions", encodeURIComponent("/work/app"), "session")
     await fs.mkdir(root, { recursive: true })
     await fs.writeFile(
       join(root, "updates.jsonl"),
@@ -103,6 +103,7 @@ describe("JSON long-tail adapters", () => {
     expect(result.events).toHaveLength(1)
     const event = result.events[0]
     expect(event.model).toBe("grok-4.6")
+    expect(event.project).toBe("/work/app")
     expect(event.provider).toBe("xai")
     expect(event.tokens).toEqual({ input: 550, output: 170, cacheRead: 400, cacheWrite: 50, reasoning: 80 })
     expect(event.costUsd).toBeCloseTo(0.12860024)
